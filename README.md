@@ -1,146 +1,85 @@
 # PaperWM.spoon
 
-Tiled scrollable window manager for MacOS. Inspired by
-[PaperWM](https://github.com/paperwm/PaperWM).
+## Fork
 
-Spoon plugin for [HammerSpoon](https://www.hammerspoon.org) MacOS automation app.
+The main purpose of this fork is to support virtual spaces like [Aerospace](https://github.com/nikitabobko/AeroSpace). The active spaces for each screen are shown in the menubar.
 
-# Demo
+Spaces are arranged vertically. All spaces are named. You can set up your own as follows:
 
-https://user-images.githubusercontent.com/900731/147793584-f937811a-20aa-4282-baf5-035e5ddc12ea.mp4
+```lua
+PaperWM.space_names = {0, "comms", "web", "util", "code", 1, 2, 3, 4, 5, 6, 7, 8, 9}
+```
+
+The last space is a scratch space called `*`, mainly used for moving around windows.
+
+Several commands are provided to switch spaces, including
+`focus_space_0`, `focus_space_1`, `focus_space_2`, `focus_space_3`, `focus_space_4`, `focus_space_5`, `focus_space_6`, `focus_space_7`, `focus_space_8`, and `focus_space_9`.
+Custom switching commands can be added as follows:
+
+```lua
+PaperWM.actions["focus_space_comms"] = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, nil, "comms")
+```
+
+You can define defaults for where apps open in spaces using the `default_app_space` object. Each key is the application name, and the value is the name of the space. The `apps_open_in_background` specifies apps where you want new windows to open in the "background" (right next to the original). The original window maintains focus. This is handy for browsers where you often want to open pages in the background. Here are examples of both.
+
+```lua
+PaperWM.default_app_space = {
+    ["Microsoft Outlook"] = "comms", Slack = "comms", 
+    Finder = "util", Ghostty = "util", Terminal = "util", 
+    Firefox = "web", Safari = "web", ["Google Chrome"] = "web", qutebrowser = "web",
+    Code = "code", 
+}
+PaperWM.apps_open_in_background = {
+    "Firefox", "Safari", "Google Chrome"
+}
+```
+
+By default, spaces are assigned to the primary screen. Spaces can be moved to other screens. PaperWM attempts to remember which screen a space was last assigned to.
+
+When windows are opened, PaperWM attempts to remember the last space and window ordering. This is based on the application and window title. This isn't perfect. When VS Code opens windows, the windows initially have no title, so the remembered ordering doesn't work. 
+
+Here are new or changed commands:
+
+- `move_to_scratch_space`--Move the current window to the scratch space. The scratch space (labeled "*") is the last space. Typically bound to `mod-Y` (yank, and `mod` is one or more modifiers like `alt` or `alt-cmd`).
+- `move_from_scratch_space`--Move all windows from the scratch space to the current space. The scratch space makes it easy to move windows around. Yank multiple windows, switch to a new space then paste. Typically bound to `mod-P` (paste).
+- `focus_scratch_space`--Switch to the scratch space.
+- `move_right_to_scratch_space`--Move the current window and all windows to the right to the scratch space. 
+- `focus_up`/`focus_down`--These now change focus up and down a space if at the top/bottom of a column.
+- `swap_*`--These were renamed to `move_*`. These now move windows up and down a space if at the top/bottom of a column. 
+- `close_window`--The same as cmd-W, except if it's the last window, it also closes the application.
+- `close_windows_in_space`--Close all windows in the space.
+- `choose_window`--This is a simple window selector that shows the available windows ordered by space. It's good enough to reduce the need for something like AltTab.
+- `next_screen`--Focus the next screen (note that the next screen needs a space in which to focus).
+- `space_to_next_screen`--Move the active space to the next screen.
+
+There are still bugs:
+
+- Sometimes everything blitzes out, and spaces keep switching, making everything flicker. Sometimes switching spaces helps. Locking and coming back out can stop it.
+- Sometimes, cycling window widths doesn't work right.
+- After returning from full screen, the window doesn't show the right space.
+
+It would also be nice to allow windows to be in multiple spaces, but that's a big code change and would require removing or changing `index_table`.
+
+https://github.com/user-attachments/assets/dc567e25-ac42-42c1-b045-d526f66fb858
+
+## Original PaperWM.spoon info
+
+Many of the original [PaperWM.spoon](https://github.com/mogenson/PaperWM.spoon) docs and issues are still appropriate.
 
 ## Installation
 
-1. Clone to Hammerspoon Spoons directory: `git clone https://github.com/mogenson/PaperWM.spoon ~/.hammerspoon/Spoons/PaperWM.spoon`.
+1. Clone to Hammerspoon Spoons directory: `git clone https://github.com/tshort/PaperWM.spoon ~/.hammerspoon/Spoons/PaperWM.spoon`.
 
-2. Open `System Preferences` -> `Mission Control`. Uncheck "Automatically
-rearrange Spaces based on most recent use" and check "Displays have separate
-Spaces".
-
-<img width="780" alt="Screen Shot 2022-01-07 at 14 10 11" src="https://user-images.githubusercontent.com/900731/148595715-1f7a3509-1289-4d10-b64d-86b84c076b43.png">
-
-### Install with [SpoonInstall](https://www.hammerspoon.org/Spoons/SpoonInstall.html)
-
-```lua
-hs.loadSpoon("SpoonInstall")
-
-spoon.SpoonInstall.repos.PaperWM = {
-    url = "https://github.com/mogenson/PaperWM.spoon",
-    desc = "PaperWM.spoon repository",
-    branch = "release",
-}
-
-spoon.SpoonInstall:andUse("PaperWM", {
-    repo = "PaperWM",
-    config = { screen_margin = 16, window_gap = 2 },
-    start = true,
-    hotkeys = {
-		< see below >
-    }
-})
-```
+2. Open `System Preferences` -> `Mission Control`. Uncheck "Displays have separate Spaces".
 
 ## Usage
 
-Add the following to your `~/.hammerspoon/init.lua`:
+Add configuration information to your `~/.hammerspoon/init.lua`. Here is an example configuration:
 
-```lua
-PaperWM = hs.loadSpoon("PaperWM")
-PaperWM:bindHotkeys({
-    -- switch to a new focused window in tiled grid
-    focus_left  = {{"alt", "cmd"}, "left"},
-    focus_right = {{"alt", "cmd"}, "right"},
-    focus_up    = {{"alt", "cmd"}, "up"},
-    focus_down  = {{"alt", "cmd"}, "down"},
+* [init.lua](./example-init.lua)
+* [menuHammerCustomConfig.lua](./menuHammerCustomConfig.lua)
 
-    -- move windows around in tiled grid
-    swap_left  = {{"alt", "cmd", "shift"}, "left"},
-    swap_right = {{"alt", "cmd", "shift"}, "right"},
-    swap_up    = {{"alt", "cmd", "shift"}, "up"},
-    swap_down  = {{"alt", "cmd", "shift"}, "down"},
-
-    -- position and resize focused window
-    center_window        = {{"alt", "cmd"}, "c"},
-    full_width           = {{"alt", "cmd"}, "f"},
-    cycle_width          = {{"alt", "cmd"}, "r"},
-    reverse_cycle_width  = {{"ctrl", "alt", "cmd"}, "r"},
-    cycle_height         = {{"alt", "cmd", "shift"}, "r"},
-    reverse_cycle_height = {{"ctrl", "alt", "cmd", "shift"}, "r"},
-
-    -- move focused window into / out of a column
-    slurp_in = {{"alt", "cmd"}, "i"},
-    barf_out = {{"alt", "cmd"}, "o"},
-
-    -- move the focused window into / out of the tiling layer
-    toggle_floating = {{"alt", "cmd", "shift"}, "escape"},
-
-    -- switch to a new Mission Control space
-    switch_space_l = {{"alt", "cmd"}, ","},
-    switch_space_r = {{"alt", "cmd"}, "."},
-    switch_space_1 = {{"alt", "cmd"}, "1"},
-    switch_space_2 = {{"alt", "cmd"}, "2"},
-    switch_space_3 = {{"alt", "cmd"}, "3"},
-    switch_space_4 = {{"alt", "cmd"}, "4"},
-    switch_space_5 = {{"alt", "cmd"}, "5"},
-    switch_space_6 = {{"alt", "cmd"}, "6"},
-    switch_space_7 = {{"alt", "cmd"}, "7"},
-    switch_space_8 = {{"alt", "cmd"}, "8"},
-    switch_space_9 = {{"alt", "cmd"}, "9"},
-
-    -- move focused window to a new space and tile
-    move_window_1 = {{"alt", "cmd", "shift"}, "1"},
-    move_window_2 = {{"alt", "cmd", "shift"}, "2"},
-    move_window_3 = {{"alt", "cmd", "shift"}, "3"},
-    move_window_4 = {{"alt", "cmd", "shift"}, "4"},
-    move_window_5 = {{"alt", "cmd", "shift"}, "5"},
-    move_window_6 = {{"alt", "cmd", "shift"}, "6"},
-    move_window_7 = {{"alt", "cmd", "shift"}, "7"},
-    move_window_8 = {{"alt", "cmd", "shift"}, "8"},
-    move_window_9 = {{"alt", "cmd", "shift"}, "9"}
-})
-PaperWM:start()
-```
-
-Feel free to customize hotkeys or use
-`PaperWM:bindHotkeys(PaperWM.default_hotkeys)` for defaults. PaperWM actions are also
-available for manual keybinding via the `PaperWM.actions` table; for example, the
-following would enable navigation by either arrow keys or vim-style h/j/k/l directions:
-
-```lua
-PaperWM = hs.loadSpoon("PaperWM")
-PaperWM:bindHotkeys(PaperWM.default_hotkeys)
-
-hs.hotkey.bind({"ctrl", "alt", "cmd"}, "h", PaperWM.actions.focus_left)
-hs.hotkey.bind({"ctrl", "alt", "cmd"}, "j", PaperWM.actions.focus_down)
-hs.hotkey.bind({"ctrl", "alt", "cmd"}, "k", PaperWM.actions.focus_up)
-hs.hotkey.bind({"ctrl", "alt", "cmd"}, "l", PaperWM.actions.focus_right)
-
-hs.hotkey.bind({"ctrl", "alt", "cmd", "shift"}, "h", PaperWM.actions.swap_left)
-hs.hotkey.bind({"ctrl", "alt", "cmd", "shift"}, "j", PaperWM.actions.swap_down)
-hs.hotkey.bind({"ctrl", "alt", "cmd", "shift"}, "k", PaperWM.actions.swap_up)
-hs.hotkey.bind({"ctrl", "alt", "cmd", "shift"}, "l", PaperWM.actions.swap_right)
-```
-
-`PaperWM:start()` will begin automatically tiling new and existing windows. `PaperWM:stop()` will
-release control over windows.
-
-Set `PaperWM.window_gap` to the number of pixels to space between windows and
-the top and bottom screen edges.
-
-Configure one or many `PaperWM.window_filter:rejectApp("appName")` to ignore specific applications. For example:
-
-```lua
-PaperWM.window_filter:rejectApp("iStat Menus Status")
-PaperWM.window_filter:rejectApp("Finder")
-PaperWM:start() -- restart for new window filter to take effect
-```
-
-Set `PaperWM.window_ratios` to the ratios to cycle window widths and heights
-through. For example:
-
-```lua
-PaperWM.window_ratios = { 0.23607, 0.38195, 0.61804 }
-```
+Edit as needed based on preferences for keyboard shortcuts and use of spaces. This configuration adds a [MenuHammer](https://github.com/FryJay/MenuHammer) menu for window management. After most operations, the menu remains active, so it's nice for multiple operations.
 
 ## Limitations
 
@@ -149,7 +88,7 @@ be tiled off-screen are placed in a margin on the left and right edge of the
 screen. They are still visible and clickable.
 
 It's difficult to detect when a window is dragged from one space or screen to
-another. Use the `move_window_N` commands to move windows between spaces and
+another. Use the yank/paste commands to move windows between spaces and
 screens.
 
 Arrange screens vertically to prevent windows from bleeding into other screens.
@@ -160,7 +99,6 @@ Arrange screens vertically to prevent windows from bleeding into other screens.
 
 The following Spoons compliment PaperWM.spoon nicely.
 
-- [ActiveSpace.spoon](https://github.com/mogenson/ActiveSpace.Spoon) Show active and layout of Mission Control spaces in the menu bar.
 - [Swipe.spoon](https://github.com/mogenson/Swipe.spoon) Perform actions when trackpad swipe gestures are recognized. Here's an example config to change PaperWM.spoon focused window:
 ```lua
 -- focus adjacent window with 3 finger swipe
@@ -189,13 +127,21 @@ Swipe:start(3, function(direction, distance, id)
 end)
 ```
 
-## Contributing
+## Browsers that work well with scrolling windows
 
-Contributions are welcome! Here are a few preferences:
-- Global variables are `CamelCase` (eg. `PaperWM`)
-- Local variables are `snake_case` (eg. `local focused_window`)
-- Function names are `lowerCamelCase` (eg. `function windowEventHandler()`)
-- Use `<const>` where possible
-- Create a local copy when deeply nested members are used often (eg. `local Watcher <const> = hs.uielement.watcher`)
+The PaperWM style works well with browsing where windows replace the use of tabs. Here's a rundown on browsers that work well with this mode of browsing.
 
-Code format checking and linting is provided by [lua-language-server](https://github.com/LuaLS/lua-language-server) for commits and pull requests. Run `lua-language-server --check=init.lua` locally before commiting.
+* *Firefox*--With the [NoTabs](https://addons.mozilla.org/en-US/firefox/addon/adsum-notabs/) plugin, all pages opens in a new window. Plugins like [Surfingkeys](https://addons.mozilla.org/en-US/firefox/addon/surfingkeys_ff/?utm_source=addons.mozilla.org&utm_medium=referral&utm_content=search) can be used to open links in a new window. 
+* *Safari*--Includes an option to open new tabs as windows. Then, cmd-click opens links in the window to the right.
+* *qutebrowser*--Has the option `tabs.tabs_are_windows` to open tabs as new windows with cmd-click or `;b` or `;f`.
+
+Many websites are responsive, so they work well with narrow windows. Many feel more usable to me. Some of the main search sites like Google are not responsive. For these, it helps to adjust the User Agent to an iPad or Android tablet. 
+
+With the `PaperWM.apps_open_in_background` option, you can set new browser windows to open next to the original window, and focus stays with the original window.
+
+## Other apps that work well with scrolling windows
+
+Terminal-based apps, including editors like Helix work great with scrolling windows.
+
+VS Code has the option "Move into New Window" for tabs. That works nicely.
+
