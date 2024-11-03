@@ -335,15 +335,15 @@ end
 ---make the specified space the active space
 ---@param space Space
 ---@param window Window|nil a window in the space
--- local function focusSpace(screen, space)
---     for w in window_list[screen][window_list[screen].activespace].visiblewindows do
---         stashWindow(w)
---     end
---     window_list[screen].activespace = space
---     for w in window_list[screen][space].visiblewindows do
---         restoreWindow(w)
---     end
--- end
+local function focusSpace(screen, space)
+    for w in window_list[screen][window_list[screen].activespace].visiblewindows do
+        stashWindow(w)
+    end
+    window_list[screen].activespace = space
+    for w in window_list[screen][space].visiblewindows do
+        restoreWindow(w)
+    end
+end
 
 ---make the specified space the active space
 ---@param space Space

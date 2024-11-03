@@ -151,9 +151,10 @@ local window_list = {} -- 3D array of tiles in order of [screen][space][x][y]
                        -- also stores 
                        --     [screen].activespace
                        --     [screen][space].activewindow
-                       --     [screen][space].visiblewindows
                        --     [screen][space][x][y].id
-                       --     [screen][space][x][y].frame
+                       --     [screen][space][x][y].position
+                       --     [screen][space][x][y].screen
+                       --     [screen][space][x][y].space
                        
 local index_table = {} -- dictionary of {screen, space, x, y} with window id for keys
 local ui_watchers = {} -- dictionary of uielement watchers with window id for keys
@@ -162,36 +163,36 @@ local is_floating = {} -- dictionary of boolean with window id for keys
 -- refresh window layout on screen change
 local screen_watcher = Screen.watcher.new(function() PaperWM:refreshWindows() end)
 
--- https://stackoverflow.com/questions/640642/how-do-you-copy-a-lua-table-by-value
-function copy(obj, seen)
-  if type(obj) ~= 'table' then return obj end
-  if seen and seen[obj] then return seen[obj] end
-  local s = seen or {}
-  local res = setmetatable({}, getmetatable(obj))
-  s[obj] = res
-  for k, v in pairs(obj) do res[copy(k, s)] = copy(v, s) end
-  return res
-end
-
 ---move a window offsreen
 ---@param windowid window to move
 ---@return nil
 local function stashWindow(window)
-    local idx = idx_table[window.id]
-    local screen_frame = idx.screen:frame()
-    local frame = window.id:frame()
-    window.frame = copy(frame)      -- remember its position
-    frame.x = screen_frame.x2
+    local w = window_list[unpack(idx)]
+    local screen_frame = screen:frame()
     self:moveWindow(window.id, frame)
-end        
-
----restore a window
----@param window window to move
----@return nil
-local function restoreWindow(window)
-    self:moveWindow(window.id, window.frame)
+        
 end
 
+---restore a window
+---@param windowid window to move
+---@return nil
+local function restoreWindow(windowid)
+    local idx = idx_table[windowid]
+    local w = window_list[unpack(idx)]
+    local frame = screen:frame()
+    
+end
+
+
+---@param screen Frame the coordinates of the screen
+---@return Window|nil
+local function getFirstVisibleWindow(columns, screen)
+    local x = screen:frame().x
+    for _, windows in ipairs(columns or {}) do
+        local window = windows[1] -- take first window in column
+        if window:frame().x >= x then return window end
+    end
+end
 
 ---return the leftmost window that's completely on the screen
 ---@param columns Window[] a column of windows
@@ -239,23 +240,11 @@ end
 ---update the column number in window_list to be ascending from provided column up
 ---@param space Space
 ---@param column number
--- local function updateIndexTable(screen, space, column)
---     local columns = window_list[screen, space] or {}
---     for col = column, #columns do
---         for row, window in ipairs(getColumn(screen, space, col)) do
---             index_table[window:id()] = { screen = screen, space = space, col = col, row = row }
---         end
---     end
--- end
-
----update the column number in window_list to be ascending from provided column up
----@param space Space
----@param column number
 local function updateIndexTable(space, column)
     local columns = window_list[space] or {}
     for col = column, #columns do
         for row, window in ipairs(getColumn(space, col)) do
-            index_table[window:id()] = { space = space, col = col, row = row }
+            index_table[window:id()] = { screen = screen, space = space, col = col, row = row }
         end
     end
 end
@@ -331,19 +320,6 @@ local function windowEventHandler(window, event, self)
 
     if space then self:tileSpace(space) end
 end
-
----make the specified space the active space
----@param space Space
----@param window Window|nil a window in the space
--- local function focusSpace(screen, space)
---     for w in window_list[screen][window_list[screen].activespace].visiblewindows do
---         stashWindow(w)
---     end
---     window_list[screen].activespace = space
---     for w in window_list[screen][space].visiblewindows do
---         restoreWindow(w)
---     end
--- end
 
 ---make the specified space the active space
 ---@param space Space
