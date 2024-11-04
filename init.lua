@@ -152,7 +152,7 @@ local window_list = {} -- 3D array of tiles in order of [screen][space][x][y]
                        --     [screen].activespace
                        --     [screen][space].activewindow
                        --     [screen][space].visiblewindows
-                       --     [screen][space][x][y].id
+                       --     [screen][space][x][y].win
                        --     [screen][space][x][y].frame
                        
 local index_table = {} -- dictionary of {screen, space, x, y} with window id for keys
@@ -174,22 +174,22 @@ function copy(obj, seen)
 end
 
 ---move a window offsreen
----@param windowid window to move
+---@param windowframe window to move
 ---@return nil
-local function stashWindow(window)
-    local idx = idx_table[window.id]
-    local screen_frame = idx.screen:frame()
-    local frame = window.id:frame()
-    window.frame = copy(frame)      -- remember its position
-    frame.x = screen_frame.x2
-    self:moveWindow(window.id, frame)
+local function stashWindow(windowframe)
+    local idx = idx_table[windowframe.win:id()]
+    local screenframe = idx.screen:frame()
+    local frame = windowframe.win:frame()
+    windowframe.frame = copy(frame)      -- remember its position
+    frame.x = screenframe.x2
+    self:moveWindow(windowframe.win, frame)
 end        
 
 ---restore a window
----@param window window to move
+---@param windowframe window to move
 ---@return nil
-local function restoreWindow(window)
-    self:moveWindow(window.id, window.frame)
+local function restoreWindow(windowframe)
+    self:moveWindow(windowframe.win, windowframe.frame)
 end
 
 
@@ -210,8 +210,7 @@ end
 ---@param space Space
 ---@param col number
 ---@return Window[]
--- local function getColumn(screen, space, col) return (window_list[screen][space] or {})[col] end
-local function getColumn(space, col) return (window_list[space] or {})[col] end
+local function getColumn(screen, space, col) return (window_list[screen][space] or {})[col] end
 
 ---get a window in a row, in a column, in a space from the window_list
 ---@param screen Screen
@@ -219,10 +218,8 @@ local function getColumn(space, col) return (window_list[space] or {})[col] end
 ---@param col number
 ---@param row number
 ---@return Window
--- local function getWindow(screen, space, col, row)
-    -- return (getColumn(screen, space, col) or {})[row]
-local function getWindow(space, col, row)
-    return (getColumn(space, col) or {})[row]
+local function getWindow(screen, space, col, row)
+    return (getColumn(screen, space, col) or {})[row]
 end
 
 ---get the tileable bounds for a screen
@@ -239,23 +236,11 @@ end
 ---update the column number in window_list to be ascending from provided column up
 ---@param space Space
 ---@param column number
--- local function updateIndexTable(screen, space, column)
---     local columns = window_list[screen, space] or {}
---     for col = column, #columns do
---         for row, window in ipairs(getColumn(screen, space, col)) do
---             index_table[window:id()] = { screen = screen, space = space, col = col, row = row }
---         end
---     end
--- end
-
----update the column number in window_list to be ascending from provided column up
----@param space Space
----@param column number
-local function updateIndexTable(space, column)
-    local columns = window_list[space] or {}
+local function updateIndexTable(screen, space, column)
+    local columns = window_list[screen, space] or {}
     for col = column, #columns do
-        for row, window in ipairs(getColumn(space, col)) do
-            index_table[window:id()] = { space = space, col = col, row = row }
+        for row, window in ipairs(getColumn(screen, space, col)) do
+            index_table[window:id()] = { screen = screen, space = space, col = col, row = row }
         end
     end
 end
@@ -335,65 +320,14 @@ end
 ---make the specified space the active space
 ---@param space Space
 ---@param window Window|nil a window in the space
--- local function focusSpace(screen, space)
---     for w in window_list[screen][window_list[screen].activespace].visiblewindows do
---         stashWindow(w)
---     end
---     window_list[screen].activespace = space
---     for w in window_list[screen][space].visiblewindows do
---         restoreWindow(w)
---     end
--- end
-
----make the specified space the active space
----@param space Space
----@param window Window|nil a window in the space
-local function focusSpace(space, window)
-    local screen = Screen(Spaces.spaceDisplay(space))
-    if not screen then
-        return
+local function focusSpace(screen, space)
+    for w in window_list[screen][window_list[screen].activespace].visiblewindows do
+        stashWindow(w)
     end
-
-    -- focus provided window or first window on new space
-    window = window or getFirstVisibleWindow(window_list[space], screen)
-
-    local do_space_focus = coroutine.wrap(function()
-        if window then
-            local function check_focus(win, n)
-                local focused = true
-                for i = 1, n do -- ensure that window focus does not change
-                    focused = focused and (Window.focusedWindow() == win)
-                    if not focused then return false end
-                    coroutine.yield(false) -- not done
-                end
-                return focused
-            end
-            repeat
-                window:focus()
-                coroutine.yield(false) -- not done
-            until (Spaces.focusedSpace() == space) and check_focus(window, 3)
-        else
-            local point = screen:frame()
-            point.x = point.x + (point.w // 2)
-            point.y = point.y - 4
-            repeat
-                leftClick(point)       -- click on menubar
-                coroutine.yield(false) -- not done
-            until Spaces.focusedSpace() == space
-        end
-
-        -- move cursor to center of screen
-        Mouse.absolutePosition(rectMidPoint(screen:frame()))
-        return true -- done
-    end)
-
-    local start_time = Timer.secondsSinceEpoch()
-    Timer.doUntil(do_space_focus, function(timer)
-        if Timer.secondsSinceEpoch() - start_time > 4 then
-            PaperWM.logger.ef("focusSpace() timeout! space %d focused space %d", space, Spaces.focusedSpace())
-            timer:stop()
-        end
-    end, Window.animationDuration)
+    window_list[screen].activespace = space
+    for w in window_list[screen][space].visiblewindows do
+        restoreWindow(w)
+    end
 end
 
 ---start automatic window tiling
@@ -628,13 +562,13 @@ function PaperWM:addWindow(add_window)
 
     -- check if window is already in window list
     if index_table[add_window:id()] then return end
-
-    local space = Spaces.windowSpaces(add_window)[1]
+    local screen = add_window:screen()
+    local space = window_list[screen].activespace
     if not space then
         self.logger.e("add window does not have a space")
         return
     end
-    if not window_list[space] then window_list[space] = {} end
+    if not window_list[screen][space] then window_list[screen][space] = {} end
 
     -- find where to insert window
     local add_column = 1
@@ -649,19 +583,19 @@ function PaperWM:addWindow(add_window)
         add_column = index_table[focused_window:id()].col + 1 -- insert to the right
     else
         local x = add_window:frame().center.x
-        for col, windows in ipairs(window_list[space]) do
-            if x < windows[1]:frame().center.x then
+        for col, windowfs in ipairs(window_list[screen][space]) do
+            if x < windowfs[1].win:frame().center.x then
                 add_column = col
                 break
             end
         end
     end
-
+    local add_windowf = {win = add_window, frame = add_window:frame()}
     -- add window
-    table.insert(window_list[space], add_column, { add_window })
+    table.insert(window_list[screen][space], add_column, { add_windowf })
 
     -- update index table
-    updateIndexTable(space, add_column)
+    updateIndexTable(screen, space, add_column)
 
     -- subscribe to window moved events
     local watcher = add_window:newWatcher(
@@ -696,10 +630,10 @@ function PaperWM:removeWindow(remove_window, skip_new_window_focus)
     end
 
     -- remove window
-    table.remove(window_list[remove_index.space][remove_index.col],
+    table.remove(window_list[remove_index.screen][remove_index.space][remove_index.col],
         remove_index.row)
-    if #window_list[remove_index.space][remove_index.col] == 0 then
-        table.remove(window_list[remove_index.space], remove_index.col)
+    if #window_list[remove_index.screen][remove_index.space][remove_index.col] == 0 then
+        table.remove(window_list[remove_index.screen][remove_index.space], remove_index.col)
     end
 
     -- remove watcher
@@ -708,11 +642,11 @@ function PaperWM:removeWindow(remove_window, skip_new_window_focus)
 
     -- update index table
     index_table[remove_window:id()] = nil
-    updateIndexTable(remove_index.space, remove_index.col)
+    updateIndexTable(remove_index.space, remove_index.space, remove_index.col)
 
     -- remove if space is empty
-    if #window_list[remove_index.space] == 0 then
-        window_list[remove_index.space] = nil
+    if #window_list[remove_index.screen][remove_index.space] == 0 then
+        window_list[remove_index.screen][remove_index.space] = nil
     end
 
     return remove_index.space -- return space for removed window
@@ -744,12 +678,12 @@ function PaperWM:focusWindow(direction, focused_index)
     if direction == Direction.LEFT or direction == Direction.RIGHT then
         -- walk down column, looking for match in neighbor column
         for row = focused_index.row, 1, -1 do
-            new_focused_window = getWindow(focused_index.space,
+            new_focused_window = getWindow(focused_index.screen, focused_index.space,
                 focused_index.col + direction, row)
             if new_focused_window then break end
         end
     elseif direction == Direction.UP or direction == Direction.DOWN then
-        new_focused_window = getWindow(focused_index.space, focused_index.col,
+        new_focused_window = getWindow(focused_index.screen, focused_index.space, focused_index.col,
             focused_index.row + (direction // 2))
     end
 
@@ -786,20 +720,21 @@ function PaperWM:swapWindows(direction)
     if direction == Direction.LEFT or direction == Direction.RIGHT then
         -- get target windows
         local target_index = { col = focused_index.col + direction }
-        local target_column = getColumn(focused_index.space, target_index.col)
+        local target_column = getColumn(focused_index.screen, focused_index.space, target_index.col)
         if not target_column then
             self.logger.d("target column not found")
             return
         end
 
         -- swap place in window list
-        local focused_column = getColumn(focused_index.space, focused_index.col)
-        window_list[focused_index.space][target_index.col] = focused_column
-        window_list[focused_index.space][focused_index.col] = target_column
+        local focused_column = getColumn(focused_index.screen, focused_index.space, focused_index.col)
+        window_list[focused_index.screen][focused_index.space][target_index.col] = focused_column
+        window_list[focused_index.screen][focused_index.space][focused_index.col] = target_column
 
         -- update index table
         for row, window in ipairs(target_column) do
             index_table[window:id()] = {
+                screen = focused_index.screen,
                 space = focused_index.space,
                 col = focused_index.col,
                 row = row
@@ -807,6 +742,7 @@ function PaperWM:swapWindows(direction)
         end
         for row, window in ipairs(focused_column) do
             index_table[window:id()] = {
+                screen = focused_index.screen,
                 space = focused_index.space,
                 col = target_index.col,
                 row = row
@@ -836,30 +772,31 @@ function PaperWM:swapWindows(direction)
     elseif direction == Direction.UP or direction == Direction.DOWN then
         -- get target window
         local target_index = {
+            screen = focused_index.screen,
             space = focused_index.space,
             col = focused_index.col,
             row = focused_index.row + (direction // 2)
         }
-        local target_window = getWindow(target_index.space, target_index.col,
+        local target_windowf = getWindow(target_index.screen, target_index.space, target_index.col,
             target_index.row)
-        if not target_window then
+        if not target_windowf then
             self.logger.d("target window not found")
             return
         end
 
         -- swap places in window list
-        window_list[target_index.space][target_index.col][target_index.row] =
-            focused_window
-        window_list[focused_index.space][focused_index.col][focused_index.row] =
-            target_window
+        window_list[target_index.screen][target_index.space][target_index.col][target_index.row] =
+            focused_windowf
+        window_list[focused_index.screen][focused_index.space][focused_index.col][focused_index.row] =
+            target_windowf
 
         -- update index table
-        index_table[target_window:id()] = focused_index
-        index_table[focused_window:id()] = target_index
+        index_table[target_windowf.win:id()] = focused_index
+        index_table[focused_windowf.win:id()] = target_index
 
         -- swap frames
-        local focused_frame = focused_window:frame()
-        local target_frame = target_window:frame()
+        local focused_frame = focused_windowf.win:frame()
+        local target_frame = target_windowf.win:frame()
         if direction == Direction.UP then
             focused_frame.y = target_frame.y
             target_frame.y = focused_frame.y2 + self.window_gap
@@ -867,8 +804,8 @@ function PaperWM:swapWindows(direction)
             target_frame.y = focused_frame.y
             focused_frame.y = target_frame.y2 + self.window_gap
         end
-        self:moveWindow(focused_window, focused_frame)
-        self:moveWindow(target_window, target_frame)
+        self:moveWindow(focused_windowf.win, focused_frame)
+        self:moveWindow(target_windowf.win, target_frame)
     end
 
     -- update layout
