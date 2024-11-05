@@ -241,7 +241,7 @@ end
 ---@param space Space
 ---@param column number
 local function updateIndexTable(screen, space, column)
-    local columns = window_list[screen, space] or {}
+    local columns = window_list[screen][space] or {}
     for col = column, #columns do
         for row, window in ipairs(getColumn(screen, space, col)) do
             index_table[window:id()] = { screen = screen, space = space, col = col, row = row }
@@ -442,10 +442,10 @@ end
 ---tile all column in a space by moving and resizing windows
 ---@param space Space
 function PaperWM:tileSpace(screen, space)
-    if not space or Spaces.spaceType(space) ~= "user" then
-        self.logger.e("current space invalid")
-        return
-    end
+    -- if not space or Spaces.spaceType(space) ~= "user" then
+    --     self.logger.e("current space invalid")
+    --     return
+    -- end
 
     -- if focused window is in space, tile from that
     local focused_window = Window.focusedWindow()
@@ -528,9 +528,9 @@ end
 function PaperWM:initWindows()
     -- find screens and windows in screens
     -- assign these to the first space on each screen
-    for screen in hs.screen:allScreens() do
+    for _, screen in pairs(hs.screen.allScreens()) do
         window_list[screen] = {}
-        for w in hs.window.filter:setScreens(screen):getWindows() do
+        for _, w in pairs(hs.window.filter.new(true):setScreens({screen}):getWindows()) do
             window_list[screen].activespace = 1
             local space = self:addWindow(window)
         end 
