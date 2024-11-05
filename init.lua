@@ -150,7 +150,7 @@ local IsFloatingKey <const> = 'PaperWM_is_floating'
 local window_list = {} -- 3D array of tiles in order of [screen][space][x][y]
                        -- also stores 
                        --     [screen].activespace
-                       --     [screen][space].activewindow
+                       --     [screen][space].focusedwindow
                        --     [screen][space].visiblewindows
                        --     [screen][space][x][y].win
                        --     [screen][space][x][y].frame
@@ -160,7 +160,7 @@ local ui_watchers = {} -- dictionary of uielement watchers with window id for ke
 local is_floating = {} -- dictionary of boolean with window id for keys
 
 -- refresh window layout on screen change
-local screen_watcher = Screen.watcher.new(function() PaperWM:refreshWindows() end)
+local screen_watcher = Screen.watcher.new(function() PaperWM:initWindows() end)
 
 -- https://stackoverflow.com/questions/640642/how-do-you-copy-a-lua-table-by-value
 function copy(obj, seen)
@@ -219,6 +219,10 @@ local function getColumn(screen, space, col) return (window_list[screen][space] 
 ---@param row number
 ---@return Window
 local function getWindow(screen, space, col, row)
+    return getWindowFrame(screen, space, col, row).win
+end
+
+local function getWindowFrame(screen, space, col, row)
     return (getColumn(screen, space, col) or {})[row]
 end
 
@@ -263,7 +267,6 @@ local pending_window = nil ---@type Window|nil
 ---@param self PaperWM
 local function windowEventHandler(window, event, self)
     self.logger.df("%s for [%s] id: %d", event, window, window and window:id() or -1)
-    local space = nil
 
     --[[ When a new window is created, We first get a windowVisible event but
     without a Space. Next we receive a windowFocused event for the window, but
@@ -273,6 +276,8 @@ local function windowEventHandler(window, event, self)
     after the window was added ]]
     --
 
+    local idx = idx_table[window:id()]
+    local space = nil
     if is_floating[window:id()] then
         -- this event is only meaningful for floating windows
         if event == "windowDestroyed" then
@@ -293,7 +298,12 @@ local function windowEventHandler(window, event, self)
             return
         end
         focused_window = window
-        space = Spaces.windowSpaces(window)[1]
+        if idx then
+            window_list[idx.screen][idx.space].focusedwindow = focused_window:id()
+            space = idx.space
+        else
+            space = self:addWindow(window)
+        end
     elseif event == "windowVisible" or event == "windowUnfullscreened" then
         space = self:addWindow(window)
         if pending_window and window == pending_window then
@@ -314,7 +324,7 @@ local function windowEventHandler(window, event, self)
         space = Spaces.windowSpaces(window)[1]
     end
 
-    if space then self:tileSpace(space) end
+    if space then self:tileSpace(window:screen(), space) end
 end
 
 ---make the specified space the active space
@@ -335,9 +345,9 @@ end
 function PaperWM:start()
     -- check for some settings
     -- TODO: remove this check
-    if not Spaces.screensHaveSeparateSpaces() then
+    if Spaces.screensHaveSeparateSpaces() then
         self.logger.e(
-            "please check 'Displays have separate Spaces' in System Preferences -> Mission Control")
+            "please uncheck 'Displays have separate Spaces' in System Preferences -> Mission Control")
     end
 
     -- clear state
@@ -357,7 +367,7 @@ function PaperWM:start()
     persistFloatingList()
 
     -- populate window list, index table, ui_watchers, and set initial layout
-    self:refreshWindows()
+    self:initWindows()
 
     -- listen for window events
     self.window_filter:subscribe({
@@ -398,7 +408,8 @@ end
 ---@return number width of tiled column
 function PaperWM:tileColumn(windows, bounds, h, w, id, h4id)
     local last_window, frame
-    for _, window in ipairs(windows) do
+    for _, windowf in ipairs(windows) do
+        local window = windowf.win
         frame = window:frame()
         w = w or frame.w -- take given width or width of first window
         if bounds.x then -- set either left or right x coord
@@ -430,16 +441,9 @@ end
 
 ---tile all column in a space by moving and resizing windows
 ---@param space Space
-function PaperWM:tileSpace(space)
+function PaperWM:tileSpace(screen, space)
     if not space or Spaces.spaceType(space) ~= "user" then
         self.logger.e("current space invalid")
-        return
-    end
-
-    -- find screen for space
-    local screen = Screen(Spaces.spaceDisplay(space))
-    if not screen then
-        self.logger.e("no screen for space")
         return
     end
 
@@ -521,29 +525,17 @@ function PaperWM:tileSpace(space)
 end
 
 ---get all windows across all spaces and retile them
-function PaperWM:refreshWindows()
-    -- get all windows across spaces
-    local all_windows = self.window_filter:getWindows()
-
-    local retile_spaces = {} -- spaces that need to be retiled
-    for _, window in ipairs(all_windows) do
-        local index = index_table[window:id()]
-        if is_floating[window:id()] then
-            -- ignore floating windows
-        elseif not index then
-            -- add window
+function PaperWM:initWindows()
+    -- find screens and windows in screens
+    -- assign these to the first space on each screen
+    for screen in hs.screen:allScreens() do
+        window_list[screen] = {}
+        for w in hs.window.filter:setScreens(screen):getWindows() do
+            window_list[screen].activespace = 1
             local space = self:addWindow(window)
-            if space then retile_spaces[space] = true end
-        elseif index.space ~= Spaces.windowSpaces(window)[1] then
-            -- move to window list in new space
-            self:removeWindow(window)
-            local space = self:addWindow(window)
-            if space then retile_spaces[space] = true end
-        end
-    end
-
-    -- retile spaces
-    for space, _ in pairs(retile_spaces) do self:tileSpace(space) end
+        end 
+        self:tileSpace(screen, 1)
+    end 
 end
 
 ---add a new window to be tracked and automatically tiled
@@ -642,7 +634,7 @@ function PaperWM:removeWindow(remove_window, skip_new_window_focus)
 
     -- update index table
     index_table[remove_window:id()] = nil
-    updateIndexTable(remove_index.space, remove_index.space, remove_index.col)
+    updateIndexTable(remove_index.screen, remove_index.space, remove_index.space, remove_index.col)
 
     -- remove if space is empty
     if #window_list[remove_index.screen][remove_index.space] == 0 then
@@ -694,6 +686,8 @@ function PaperWM:focusWindow(direction, focused_index)
 
     -- focus new window, windowFocused event will be emited immediately
     new_focused_window:focus()
+    local idx = idx_table[new_focused_window:id()]
+    window_list[idx.screen][idx.space].focusedwindow = new_focused_window:id()
     return new_focused_window
 end
 
@@ -786,17 +780,17 @@ function PaperWM:swapWindows(direction)
 
         -- swap places in window list
         window_list[target_index.screen][target_index.space][target_index.col][target_index.row] =
-            focused_windowf
+            focused_window
         window_list[focused_index.screen][focused_index.space][focused_index.col][focused_index.row] =
-            target_windowf
+            target_window
 
         -- update index table
-        index_table[target_windowf.win:id()] = focused_index
-        index_table[focused_windowf.win:id()] = target_index
+        index_table[target_window:id()] = focused_index
+        index_table[focused_window:id()] = target_index
 
         -- swap frames
-        local focused_frame = focused_windowf.win:frame()
-        local target_frame = target_windowf.win:frame()
+        local focused_frame = focused_window:frame()
+        local target_frame = target_window:frame()
         if direction == Direction.UP then
             focused_frame.y = target_frame.y
             target_frame.y = focused_frame.y2 + self.window_gap
@@ -804,12 +798,12 @@ function PaperWM:swapWindows(direction)
             target_frame.y = focused_frame.y
             focused_frame.y = target_frame.y2 + self.window_gap
         end
-        self:moveWindow(focused_windowf.win, focused_frame)
-        self:moveWindow(target_windowf.win, target_frame)
+        self:moveWindow(focused_window, focused_frame)
+        self:moveWindow(target_window, target_frame)
     end
 
     -- update layout
-    self:tileSpace(focused_index.space)
+    self:tileSpace(focused_index.screen, focused_index.space)
 end
 
 ---move the focused window to the center of the screen, horizontally
@@ -833,7 +827,7 @@ function PaperWM:centerWindow()
 
     -- update layout
     local space = Spaces.windowSpaces(focused_window)[1]
-    self:tileSpace(space)
+    self:tileSpace(window:screen(), space)
 end
 
 ---set the focused window to the width of the screen
@@ -854,7 +848,7 @@ function PaperWM:setWindowFullWidth()
 
     -- update layout
     local space = Spaces.windowSpaces(focused_window)[1]
-    self:tileSpace(space)
+    self:tileSpace(focused_window:screen(), space)
 end
 
 ---resize the width or height of the window, keeping the other dimension the
@@ -928,7 +922,7 @@ function PaperWM:cycleWindowSize(direction, cycle_direction)
 
     -- update layout
     local space = Spaces.windowSpaces(focused_window)[1]
-    self:tileSpace(space)
+    self:tileSpace(focused_window:screen(), space)
 end
 
 ---take the current focused window and move it into the bottom of
@@ -992,7 +986,7 @@ function PaperWM:slurpWindow()
     self:tileColumn(column, bounds, h)
 
     -- update layout
-    self:tileSpace(focused_index.space)
+    self:tileSpace(focused_index.screen, focused_index.space)
 end
 
 ---remove focused window from it's current column and place into
@@ -1045,7 +1039,7 @@ function PaperWM:barfWindow()
     self:tileColumn(column, bounds, h)
 
     -- update layout
-    self:tileSpace(focused_index.space)
+    self:tileSpace(focused_index.screen, focused_index.space)
 end
 
 ---switch to a Mission Control space
@@ -1200,6 +1194,9 @@ end
 ---@param window Window window to move
 ---@param frame Frame coordinates to set window size and location
 function PaperWM:moveWindow(window, frame)
+    index = index_table[window:id()]
+    window_table[index.screen][index.space][index.col][index.row].frame = frame
+    
     -- greater than 0.017 hs.window animation step time
     local padding <const> = 0.02
 
@@ -1244,14 +1241,14 @@ function PaperWM:toggleFloating()
         space = self:addWindow(window)
     end
     if space then
-        self:tileSpace(space)
+        self:tileSpace(window:screen(), space)
     end
 end
 
 ---supported window movement actions
 PaperWM.actions = {
     stop_events = partial(PaperWM.stop, PaperWM),
-    refresh_windows = partial(PaperWM.refreshWindows, PaperWM),
+    refresh_windows = partial(PaperWM.initWindows, PaperWM),
     toggle_floating = partial(PaperWM.toggleFloating, PaperWM),
     focus_left = partial(PaperWM.focusWindow, PaperWM, Direction.LEFT),
     focus_right = partial(PaperWM.focusWindow, PaperWM, Direction.RIGHT),
