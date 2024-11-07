@@ -328,6 +328,10 @@ local function windowEventHandler(window, event, self)
     if space then self:tileSpace(window:screen(), space) end
 end
 
+local function between(x, x1, x2)
+    return x >= x1 and x < x2
+end
+
 ---make the specified space the active space
 ---@param space Space
 ---@param window Window|nil a window in the space
@@ -345,9 +349,10 @@ function PaperWM:focusSpace(screenid, space)
             -- print(#wf)
             -- print(hs.inspect(screen_frame))
             -- print(hs.inspect(wf.frame))
-            if wf.frame.x >= screen_frame.x and wf.frame.x < screen_frame.x2 and
-               wf.frame.y >= screen_frame.y and wf.frame.y < screen_frame.y2 then
-                print("here")
+            if (between(wf.frame.x1, screen_frame.x1, screen_frame.x2) or
+                between(wf.frame.x2, screen_frame.x1, screen_frame.x2)) and
+               (between(wf.frame.y1, screen_frame.y1, screen_frame.y2) or
+                between(wf.frame.y2, screen_frame.y1, screen_frame.y2)) then
                 PaperWM:stashWindow(wf)
             end
         end
@@ -355,10 +360,10 @@ function PaperWM:focusSpace(screenid, space)
     window_list[screenid].activespace = space
     for _, cols in ipairs(window_list[screenid][window_list[screenid].activespace]) do
         for _, wf in ipairs(cols) do
-            if wf.frame.x >= screen_frame.x and wf.frame.x < screen_frame.x2 and
-               wf.frame.y >= screen_frame.y and wf.frame.y < screen_frame.y2 then
+            -- if wf.frame.x >= screen_frame.x and wf.frame.x < screen_frame.x2 and
+            --    wf.frame.y >= screen_frame.y and wf.frame.y < screen_frame.y2 then
                 PaperWM:restoreWindow(wf)
-            end
+            -- end
         end
     end
     print(hs.inspect(window_list[screenid][space]))
