@@ -179,7 +179,7 @@ end
 ---@return nil
 function PaperWM:stashWindow(windowframe)
     local idx = index_table[windowframe.win:id()]
-    local screenframe = hs.screen.find(idx.screen):frame()
+    local screenframe = hs.screen.find(idx.screenid):frame()
     local frame = windowframe.win:frame()
     windowframe.frame = copy(frame)      -- remember its position
     frame.x = screenframe.x2
@@ -336,32 +336,28 @@ function PaperWM:focusSpace(screenid, space)
     local screen_frame = hs.screen.find(screenid):frame()
     -- local oldscreenid = index_table[focused_window:id()].screenid
     -- for _, cols in ipairs(window_list[oldscreenid][window_list[oldscreenid].activespace]) do
+    print(space)
     print(window_list[screenid].activespace)
     for _, cols in ipairs(window_list[screenid][window_list[screenid].activespace]) do
         print(#cols)
-        for _, rows in ipairs(cols) do
-            print(hs.inspect(rows))
-            for _, wf in ipairs(rows) do
-                print(hs.inspect(wf))
-                print(#wf)
-                print(hs.inspect(screen_frame))
-                print(hs.inspect(wf.frame))
-                if wf.frame.x >= screen_frame.x and wf.frame.x < screen_frame.x2 and
-                   wf.frame.y >= screen_frame.y and wf.frame.y < screen_frame.y2 then
-                    print("here")
-                    PaperWM:stashWindow(wf)
-                end
+        for _, wf in ipairs(cols) do
+            -- print(hs.inspect(wf))
+            -- print(#wf)
+            -- print(hs.inspect(screen_frame))
+            -- print(hs.inspect(wf.frame))
+            if wf.frame.x >= screen_frame.x and wf.frame.x < screen_frame.x2 and
+               wf.frame.y >= screen_frame.y and wf.frame.y < screen_frame.y2 then
+                print("here")
+                PaperWM:stashWindow(wf)
             end
         end
     end
     window_list[screenid].activespace = space
     for _, cols in ipairs(window_list[screenid][window_list[screenid].activespace]) do
-        for _, rows in ipairs(cols) do
-            for _, wf in ipairs(rows) do
-                if wf.frame.x >= screen_frame.x and wf.frame.x < screen_frame.x2 and
-                   wf.frame.y >= screen_frame.y and wf.frame.y < screen_frame.y2 then
-                    PaperWM:restoreWindow(wf)
-                end
+        for _, wf in ipairs(cols) do
+            if wf.frame.x >= screen_frame.x and wf.frame.x < screen_frame.x2 and
+               wf.frame.y >= screen_frame.y and wf.frame.y < screen_frame.y2 then
+                PaperWM:restoreWindow(wf)
             end
         end
     end
@@ -1139,6 +1135,7 @@ function PaperWM:moveWindowToSpace(screenid, space, window)
     local new_index = index_table[focused_window:id()]
     self:tileSpace(hs.screen.find(new_index.screenid), new_index.space)
     window_list[screenid][space].focusedwindow = focused_window:id()
+    print(space)
     self:focusSpace(screenid, space)
     focused_window:focus()
 end
