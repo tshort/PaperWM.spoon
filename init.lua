@@ -181,9 +181,10 @@ function PaperWM:stashWindow(windowframe)
     local idx = index_table[windowframe.win:id()]
     local screenframe = hs.screen.find(idx.screenid):frame()
     local frame = windowframe.win:frame()
-    windowframe.frame = copy(frame)      -- remember its position
+    local frame2 = copy(frame)      -- remember its position
     frame.x = screenframe.x2
     self:moveWindow(windowframe.win, frame)
+    windowframe.frame = frame2
 end        
 
 ---restore a window
@@ -322,10 +323,12 @@ local function windowEventHandler(window, event, self)
     elseif event == "windowFullscreened" then
         space = self:removeWindow(window, true) -- don't focus new window if fullscreened
     elseif event == "AXWindowMoved" or event == "AXWindowResized" then
-        space = Spaces.windowSpaces(window)[1]
+        -- space = Spaces.windowSpaces(window)[1]
     end
 
-    if space then self:tileSpace(window:screen(), space) end
+    if space then 
+        self:tileSpace(window:screen(), space)
+    end
 end
 
 local function between(x, x1, x2)
@@ -340,10 +343,10 @@ function PaperWM:focusSpace(screenid, space)
     local screen_frame = hs.screen.find(screenid):frame()
     -- local oldscreenid = index_table[focused_window:id()].screenid
     -- for _, cols in ipairs(window_list[oldscreenid][window_list[oldscreenid].activespace]) do
-    print(space)
-    print(window_list[screenid].activespace)
+    -- print(space)
+    -- print(window_list[screenid].activespace)
     for _, cols in ipairs(window_list[screenid][window_list[screenid].activespace]) do
-        print(#cols)
+        -- print(#cols)
         for _, wf in ipairs(cols) do
             -- print(hs.inspect(wf))
             -- print(#wf)
@@ -366,7 +369,7 @@ function PaperWM:focusSpace(screenid, space)
             -- end
         end
     end
-    print(hs.inspect(window_list[screenid][space]))
+    -- print(hs.inspect(window_list[screenid][space]))
     if window_list[screenid][space].focusedwindow then
         hs.window.find(window_list[screenid][space].focusedwindow):focus()
     end
@@ -388,6 +391,7 @@ function PaperWM:start()
     ui_watchers = {}
     is_floating = {}
 
+    hs.window.animationDuration = 0
     -- restore saved is_floating state, filtering for valid windows
     local persisted = hs.settings.get(IsFloatingKey) or {}
     for _, id in ipairs(persisted) do
@@ -689,6 +693,7 @@ end
 ---@param direction Direction use either Direction UP, DOWN, LEFT, or RIGHT
 ---@param focused_index Index index of focused window within the window_list
 function PaperWM:focusWindow(direction, focused_index)
+    hs.window.animationDuration = 0.2
     if not focused_index then
         -- get current focused window
         local focused_window = Window.focusedWindow()
@@ -729,6 +734,7 @@ function PaperWM:focusWindow(direction, focused_index)
     new_focused_window:focus()
     local idx = index_table[new_focused_window:id()]
     window_list[idx.screenid][idx.space].focusedwindow = new_focused_window:id()
+    hs.window.animationDuration = 0
     return new_focused_window
 end
 
@@ -752,6 +758,7 @@ function PaperWM:swapWindows(direction)
         return
     end
 
+    hs.window.animationDuration = 0.2
     if direction == Direction.LEFT or direction == Direction.RIGHT then
         -- get target windows
         local target_index = { col = focused_index.col + direction }
@@ -767,16 +774,16 @@ function PaperWM:swapWindows(direction)
         window_list[focused_index.screenid][focused_index.space][focused_index.col] = target_column
 
         -- update index table
-        for row, window in ipairs(target_column) do
-            index_table[window:id()] = {
+        for row, windowf in ipairs(target_column) do
+            index_table[windowf.win:id()] = {
                 screenid = focused_index.screenid,
                 space = focused_index.space,
                 col = focused_index.col,
                 row = row
             }
         end
-        for row, window in ipairs(focused_column) do
-            index_table[window:id()] = {
+        for row, windowf in ipairs(focused_column) do
+            index_table[windowf.win:id()] = {
                 screenid = focused_index.screenid,
                 space = focused_index.space,
                 col = target_index.col,
@@ -786,7 +793,7 @@ function PaperWM:swapWindows(direction)
 
         -- swap frames
         local focused_frame = focused_window:frame()
-        local target_frame = target_column[1]:frame()
+        local target_frame = target_column[1].win:frame()
         if direction == Direction.LEFT then
             focused_frame.x = target_frame.x
             target_frame.x = focused_frame.x2 + self.window_gap
@@ -794,15 +801,15 @@ function PaperWM:swapWindows(direction)
             target_frame.x = focused_frame.x
             focused_frame.x = target_frame.x2 + self.window_gap
         end
-        for _, window in ipairs(target_column) do
-            local frame = window:frame()
+        for _, windowf in ipairs(target_column) do
+            local frame = windowf.win:frame()
             frame.x = target_frame.x
-            self:moveWindow(window, frame)
+            self:moveWindow(windowf.win, frame)
         end
-        for _, window in ipairs(focused_column) do
-            local frame = window:frame()
+        for _, windowf in ipairs(focused_column) do
+            local frame = windowf.win:frame()
             frame.x = focused_frame.x
-            self:moveWindow(window, frame)
+            self:moveWindow(windowf.win, frame)
         end
     elseif direction == Direction.UP or direction == Direction.DOWN then
         -- get target window
@@ -812,7 +819,7 @@ function PaperWM:swapWindows(direction)
             col = focused_index.col,
             row = focused_index.row + (direction // 2)
         }
-        local target_windowf = getWindow(target_index.screenid, target_index.space, target_index.col,
+        local target_windowf = getWindowFrame(target_index.screenid, target_index.space, target_index.col,
             target_index.row)
         if not target_windowf then
             self.logger.d("target window not found")
@@ -821,17 +828,17 @@ function PaperWM:swapWindows(direction)
 
         -- swap places in window list
         window_list[target_index.screenid][target_index.space][target_index.col][target_index.row] =
-            focused_window
+            focused_windowf
         window_list[focused_index.screenid][focused_index.space][focused_index.col][focused_index.row] =
-            target_window
+            target_windowf
 
         -- update index table
-        index_table[target_window:id()] = focused_index
-        index_table[focused_window:id()] = target_index
+        index_table[target_windowf.win:id()] = focused_index
+        index_table[focused_windowf.win:id()] = target_index
 
         -- swap frames
-        local focused_frame = focused_window:frame()
-        local target_frame = target_window:frame()
+        local focused_frame = focused_windowf.win:frame()
+        local target_frame = target_windowf.win:frame()
         if direction == Direction.UP then
             focused_frame.y = target_frame.y
             target_frame.y = focused_frame.y2 + self.window_gap
@@ -839,9 +846,10 @@ function PaperWM:swapWindows(direction)
             target_frame.y = focused_frame.y
             focused_frame.y = target_frame.y2 + self.window_gap
         end
-        self:moveWindow(focused_window, focused_frame)
-        self:moveWindow(target_window, target_frame)
+        self:moveWindow(focused_windowf.win, focused_frame)
+        self:moveWindow(target_windowf.win, target_frame)
     end
+    hs.window.animationDuration = 0
 
     -- update layout
     self:tileSpace(focused_index.screenid, focused_index.space)
@@ -850,6 +858,7 @@ end
 ---move the focused window to the center of the screen, horizontally
 ---don't resize the window or change it's vertical position
 function PaperWM:centerWindow()
+    hs.window.animationDuration = 0.2
     -- get current focused window
     local focused_window = Window.focusedWindow()
     if not focused_window then
@@ -869,11 +878,13 @@ function PaperWM:centerWindow()
     -- update layout
     local space = Spaces.windowSpaces(focused_window)[1]
     self:tileSpace(window:screen(), space)
+    hs.window.animationDuration = 0
 end
 
 ---set the focused window to the width of the screen
 ---don't change the height
 function PaperWM:setWindowFullWidth()
+    hs.window.animationDuration = 0.2
     -- get current focused window
     local focused_window = Window.focusedWindow()
     if not focused_window then
@@ -889,6 +900,7 @@ function PaperWM:setWindowFullWidth()
 
     -- update layout
     self:tileSpace(focused_window:screen(), index_table[focused_window:id()].space)
+    hs.window.animationDuration = 0
 end
 
 ---resize the width or height of the window, keeping the other dimension the
@@ -896,6 +908,7 @@ end
 ---@param direction Direction use Direction.WIDTH or Direction.HEIGHT
 ---@param cycle_direction Direction use Direction.ASCENDING or DESCENDING
 function PaperWM:cycleWindowSize(direction, cycle_direction)
+    hs.window.animationDuration = 0.2
     -- get current focused window
     local focused_window = Window.focusedWindow()
     if not focused_window then
@@ -962,6 +975,7 @@ function PaperWM:cycleWindowSize(direction, cycle_direction)
 
     -- update layout
     self:tileSpace(focused_window:screen(), index_table[focused_window:id()].space)
+    hs.window.animationDuration = 0
 end
 
 ---take the current focused window and move it into the bottom of
@@ -1133,6 +1147,7 @@ function PaperWM:moveWindowToSpace(screenid, space, window)
         return
     end
 
+    hs.window.animationDuration = 0
     local old_index = copy(focused_index)
     self:removeWindow(focused_window, true)
     self:tileSpace(hs.screen.find(old_index.screenid), old_index.space)
@@ -1259,3 +1274,10 @@ function PaperWM:bindHotkeys(mapping)
 end
 
 return PaperWM
+
+
+-- TODO
+
+-- Fix left and right when at end
+-- Change focusedwindow for the space where a window was moved out of
+-- Fix alt-tab to another space
