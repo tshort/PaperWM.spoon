@@ -378,8 +378,8 @@ function PaperWM:focusSpace(screenid, space, window)
     for i, cols in ipairs(window_list[screenid][window_list[screenid].activespace]) do
         for _, wf in ipairs(cols) do
             if isvisible(wf.frame, screen_frame) then
-                print(hs.inspect(wf.win:title()))
-                print(hs.inspect(wf.win:frame()))
+                -- print(hs.inspect(wf.win:title()))
+                -- print(hs.inspect(wf.win:frame()))
                 PaperWM:restoreWindow(wf)
             end
         end
@@ -727,8 +727,8 @@ function PaperWM:focusWindow(direction, focused_index)
     if direction == Direction.LEFT or direction == Direction.RIGHT then
         -- walk down column, looking for match in neighbor column
         for row = focused_index.row, 1, -1 do
-            print(focused_index.screenid .. ":" .. focused_index.space .. ":" .. focused_index.col .. ":" .. focused_index.row)
-            print(window_list[focused_index.screenid][focused_index.space][focused_index.col][focused_index.row].win:title())
+            -- print(focused_index.screenid .. ":" .. focused_index.space .. ":" .. focused_index.col .. ":" .. focused_index.row)
+            -- print(window_list[focused_index.screenid][focused_index.space][focused_index.col][focused_index.row].win:title())
             new_focused_window = getWindow(focused_index.screenid, focused_index.space,
                 focused_index.col + direction, row)
             if new_focused_window then break end
@@ -745,7 +745,6 @@ function PaperWM:focusWindow(direction, focused_index)
 
     -- focus new window, windowFocused event will be emited immediately
     if new_focused_window:isMinimized() then
-        print("unminimizing")
         new_focused_window:unminimize()
     end
     new_focused_window:focus()
