@@ -159,6 +159,16 @@ window_list = {} -- 3D array of tiles in order of [screenid][space][x][y]
 index_table = {} -- dictionary of {screenid, space, x, y} with window id for keys
 local ui_watchers = {} -- dictionary of uielement watchers with window id for keys
 local is_floating = {} -- dictionary of boolean with window id for keys
+menubar = hs.menubar.new(true, "spaceindicator")
+
+local function updatemenu()
+    local strings = {}
+    for _, screen in pairs(hs.screen.allScreens()) do
+        table.insert(strings, window_list[screen:id()].activespace)
+    end
+    strings = table.concat(strings, "-")
+    menubar:setTitle(strings)
+end
 
 -- refresh window layout on screen change
 local screen_watcher = Screen.watcher.new(function() PaperWM:initWindows() end)
@@ -376,6 +386,7 @@ function PaperWM:focusSpace(screenid, space, window)
     elseif window_list[screenid][space].focusedwindow then
         hs.window.find(window_list[screenid][space].focusedwindow):focus()
     end
+    updatemenu()
 end
 
 ---start automatic window tiling
@@ -576,6 +587,7 @@ function PaperWM:initWindows()
         end 
         self:tileSpace(screen, 1)
     end 
+    updatemenu()
 end
 
 ---add a new window to be tracked and automatically tiled
@@ -1280,4 +1292,6 @@ return PaperWM
 
 -- Fix left and right when at end
 -- DONE Change focusedwindow for the space where a window was moved out of
--- Fix alt-tab to another space
+-- DONE Fix alt-tab to another space
+-- DONE Menubar
+-- Bug with windows stached on the right that are not fully off screen
