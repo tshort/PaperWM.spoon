@@ -1157,8 +1157,7 @@ function PaperWM:moveWindowToSpace(screenid, space, window)
     local new_index = index_table[focused_window:id()]
     self:tileSpace(hs.screen.find(new_index.screenid), new_index.space)
     window_list[screenid][space].focusedwindow = focused_window:id()
-    self:focusSpace(screenid, space)
-    focused_window:focus()
+    self:focusSpace(screenid, space, focused_window)
 end
 
 
