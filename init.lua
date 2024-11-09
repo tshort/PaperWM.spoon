@@ -192,7 +192,7 @@ function PaperWM:stashWindow(windowframe)
     local screenframe = hs.screen.find(idx.screenid):frame()
     local frame = windowframe.win:frame()
     local frame2 = copy(frame)      -- remember its position
-    frame.x = screenframe.x2
+    frame.x = screenframe.x2 - 1
     self:moveWindow(windowframe.win, frame)
     windowframe.frame = frame2
 end        
@@ -315,6 +315,7 @@ local function windowEventHandler(window, event, self)
         end
         focused_window = window
         if idx then
+            hs.alert.show(idx.col)
             window_list[idx.screenid][idx.space].focusedwindow = focused_window:id()
             space = idx.space
             if idx_prior then
@@ -377,6 +378,8 @@ function PaperWM:focusSpace(screenid, space, window)
     for i, cols in ipairs(window_list[screenid][window_list[screenid].activespace]) do
         for _, wf in ipairs(cols) do
             if isvisible(wf.frame, screen_frame) then
+                print(hs.inspect(wf.win:title()))
+                print(hs.inspect(wf.win:frame()))
                 PaperWM:restoreWindow(wf)
             end
         end
@@ -704,6 +707,7 @@ function PaperWM:focusWindow(direction, focused_index)
     if not focused_index then
         -- get current focused window
         local focused_window = Window.focusedWindow()
+        -- focused_window = focused_window or Window.focusedWindow()
         if not focused_window then
             self.logger.d("focused window not found")
             return
@@ -723,6 +727,8 @@ function PaperWM:focusWindow(direction, focused_index)
     if direction == Direction.LEFT or direction == Direction.RIGHT then
         -- walk down column, looking for match in neighbor column
         for row = focused_index.row, 1, -1 do
+            print(focused_index.screenid .. ":" .. focused_index.space .. ":" .. focused_index.col .. ":" .. focused_index.row)
+            print(window_list[focused_index.screenid][focused_index.space][focused_index.col][focused_index.row].win:title())
             new_focused_window = getWindow(focused_index.screenid, focused_index.space,
                 focused_index.col + direction, row)
             if new_focused_window then break end
@@ -738,6 +744,10 @@ function PaperWM:focusWindow(direction, focused_index)
     end
 
     -- focus new window, windowFocused event will be emited immediately
+    if new_focused_window:isMinimized() then
+        print("unminimizing")
+        new_focused_window:unminimize()
+    end
     new_focused_window:focus()
     local idx = index_table[new_focused_window:id()]
     window_list[idx.screenid][idx.space].focusedwindow = new_focused_window:id()
@@ -859,7 +869,7 @@ function PaperWM:swapWindows(direction)
     hs.window.animationDuration = 0
 
     -- update layout
-    self:tileSpace(focused_index.screenid, focused_index.space)
+    self:tileSpace(target_windowf.win:screen(), focused_index.space)
 end
 
 ---move the focused window to the center of the screen, horizontally
@@ -1047,7 +1057,7 @@ function PaperWM:slurpWindow()
     self:tileColumn(column, bounds, h)
 
     -- update layout
-    self:tileSpace(focused_index.screenid, focused_index.space)
+    self:tileSpace(focused_window:screen(), focused_index.space)
 end
 
 ---remove focused window from it's current column and place into
@@ -1100,11 +1110,11 @@ function PaperWM:barfWindow()
     self:tileColumn(column, bounds, h)
 
     -- update layout
-    self:tileSpace(focused_index.screen, focused_index.space)
+    self:tileSpace(focused_window:screen(), focused_index.space)
 end
 
 ---switch to a Mission Control space to the left or right of current space
----@param direction Direction use Direction.LEFT or Direction.RIGHT
+---@param direction Direction use Direction.UP or Direction.DOWN
 function PaperWM:incrementSpace(direction)
     local index = index_table[focused_window:id()]
     if direction == Direction.UP and index.space > 1 then
@@ -1226,7 +1236,7 @@ function PaperWM:toggleFloating()
         space = self:addWindow(window)
     end
     if space then
-        self:tileSpace(window:screen():id(), space)
+        self:tileSpace(window:screen(), space)
     end
 end
 
@@ -1294,4 +1304,5 @@ return PaperWM
 -- DONE Change focusedwindow for the space where a window was moved out of
 -- DONE Fix alt-tab to another space
 -- DONE Menubar
--- Bug with windows stached on the right that are not fully off screen
+-- DONE Bug with windows stached on the right that are not fully off screen
+-- Bug with a blocking gap between left and right windows - move jumps the gap
