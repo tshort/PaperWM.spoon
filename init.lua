@@ -162,12 +162,17 @@ local is_floating = {} -- dictionary of boolean with window id for keys
 menubar = hs.menubar.new(true, "spaceindicator")
 
 local function updatemenu()
-    local strings = {}
-    for _, screen in pairs(hs.screen.allScreens()) do
-        table.insert(strings, window_list[screen:id()].activespace)
+    local title = ""
+    for i, screen in ipairs(hs.screen.allScreens()) do
+        title = title .. window_list[screen:id()].activespace
+        if screen == hs.screen.mainScreen() then
+            title = title .. "-" .. index_table[hs.window.focusedWindow():id()].col
+        end
+        if i < #hs.screen.allScreens() then
+            title = title .. ":"
+        end
     end
-    strings = table.concat(strings, "-")
-    menubar:setTitle(strings)
+    menubar:setTitle(title)
 end
 
 -- refresh window layout on screen change
@@ -315,7 +320,8 @@ local function windowEventHandler(window, event, self)
         end
         focused_window = window
         if idx then
-            hs.alert.show(idx.col)
+            -- hs.alert.show(idx.col)
+            updatemenu()
             window_list[idx.screenid][idx.space].focusedwindow = focused_window:id()
             space = idx.space
             if idx_prior then
