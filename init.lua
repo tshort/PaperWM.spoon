@@ -120,10 +120,10 @@ PaperWM.window_filter = WindowFilter.new():setOverrideFilter({
 })
 
 -- number of pixels between windows
-PaperWM.window_gap = 8
+PaperWM.window_gap = 4
 
 -- ratios to use when cycling widths and heights, golden ratio by default
-PaperWM.window_ratios = { 0.3, 0.6, 0.8}
+PaperWM.window_ratios = { 0.5, 0.7, 0.9}
 
 -- size of the on-screen margin to place off-screen windows
 PaperWM.screen_margin = 1
@@ -720,7 +720,8 @@ end
 ---@param direction Direction use either Direction UP, DOWN, LEFT, or RIGHT
 ---@param focused_index Index index of focused window within the window_list
 function PaperWM:focusWindow(direction, focused_index)
-    hs.window.animationDuration = 0.2
+    -- hs.window.animationDuration = 0.2
+    hs.window.animationDuration = 0
     if not focused_index then
         -- get current focused window
         local focused_window = Window.focusedWindow()
@@ -791,7 +792,8 @@ function PaperWM:swapWindows(direction)
         return
     end
 
-    hs.window.animationDuration = 0.2
+    -- hs.window.animationDuration = 0.2
+    hs.window.animationDuration = 0
     if direction == Direction.LEFT or direction == Direction.RIGHT then
         -- get target windows
         local target_index = { col = focused_index.col + direction }
@@ -891,7 +893,8 @@ end
 ---move the focused window to the center of the screen, horizontally
 ---don't resize the window or change it's vertical position
 function PaperWM:centerWindow()
-    hs.window.animationDuration = 0.2
+    -- hs.window.animationDuration = 0.2
+    hs.window.animationDuration = 0
     -- get current focused window
     local focused_window = Window.focusedWindow()
     if not focused_window then
@@ -917,7 +920,8 @@ end
 ---set the focused window to the width of the screen
 ---don't change the height
 function PaperWM:setWindowFullWidth()
-    hs.window.animationDuration = 0.2
+    -- hs.window.animationDuration = 0.2
+    hs.window.animationDuration = 0
     -- get current focused window
     local focused_window = Window.focusedWindow()
     if not focused_window then
@@ -941,7 +945,8 @@ end
 ---@param direction Direction use Direction.WIDTH or Direction.HEIGHT
 ---@param cycle_direction Direction use Direction.ASCENDING or DESCENDING
 function PaperWM:cycleWindowSize(direction, cycle_direction)
-    hs.window.animationDuration = 0.2
+    -- hs.window.animationDuration = 0.2
+    hs.window.animationDuration = 0
     -- get current focused window
     local focused_window = Window.focusedWindow()
     if not focused_window then
