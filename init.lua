@@ -236,7 +236,12 @@ local function getColumn(screenid, space, col) return (window_list[screenid][spa
 ---@param row number
 ---@return Window
 local function getWindow(screenid, space, col, row)
-    return (getColumn(screenid, space, col) or {})[row].win
+    local col = getColumn(screenid, space, col) 
+    if col then
+        return col[row].win
+    else
+        return nil
+    end
 end
 
 local function getWindowFrame(screenid, space, col, row)
@@ -373,10 +378,14 @@ end
 ---@param window Window|nil a window in the space
 function PaperWM:focusSpace(screenid, space, window)
     local screen_frame = hs.screen.find(screenid):frame()
-    for i, cols in ipairs(window_list[screenid][window_list[screenid].activespace]) do
-        for _, wf in ipairs(cols) do
-            if isvisible(wf.win:frame(), screen_frame) then
-                PaperWM:stashWindow(wf)
+    print(screenid)
+    print(space)
+    if window_list[screenid][window_list[screenid].activespace] then
+        for i, cols in ipairs(window_list[screenid][window_list[screenid].activespace]) do
+            for _, wf in ipairs(cols) do
+                if isvisible(wf.win:frame(), screen_frame) then
+                    PaperWM:stashWindow(wf)
+                end
             end
         end
     end
@@ -683,6 +692,8 @@ function PaperWM:removeWindow(remove_window, skip_new_window_focus)
     end
 
     -- remove window
+    print("remove_index")
+    print(hs.inspect(remove_index))
     table.remove(window_list[remove_index.screenid][remove_index.space][remove_index.col],
         remove_index.row)
     if #window_list[remove_index.screenid][remove_index.space][remove_index.col] == 0 then
@@ -1143,12 +1154,16 @@ function PaperWM:goDownSpace()
     end
 end
 function PaperWM:moveWindowUpSpace()
+    print("Up - index_table")
+    print(hs.inspect(index_table))
     local index = index_table[focused_window:id()]
     if index.space > 1 then
         self:moveWindowToSpace(index.screenid, index.space - 1)
     end
 end
 function PaperWM:moveWindowDownSpace()
+    print("Down - index_tble")
+    print(hs.inspect(index_table))
     local index = index_table[focused_window:id()]
     self:moveWindowToSpace(index.screenid, index.space + 1)
 end
@@ -1173,7 +1188,7 @@ function PaperWM:moveWindowToSpace(screenid, space, window)
     local old_index = copy(focused_index)
     if old_index.col > 1 then
         window_list[old_index.screenid][old_index.space].focusedwindow = window_list[old_index.screenid][old_index.space][old_index.col - 1][1].win:id()
-    elseif old_index.col < #(window_list[old_index.screenid]) then
+    elseif old_index.col < #(window_list[old_index.screenid][old_index.space]) then
         window_list[old_index.screenid][old_index.space].focusedwindow = window_list[old_index.screenid][old_index.space][old_index.col + 1][1].win:id()
     else
         window_list[old_index.screenid][old_index.space].focusedwindow = nil
@@ -1184,6 +1199,8 @@ function PaperWM:moveWindowToSpace(screenid, space, window)
     local new_index = index_table[focused_window:id()]
     self:tileSpace(hs.screen.find(new_index.screenid), new_index.space)
     window_list[screenid][space].focusedwindow = focused_window:id()
+    print("focused_window")
+    print(hs.inspect(focused_window))
     self:focusSpace(screenid, space, focused_window)
 end
 
