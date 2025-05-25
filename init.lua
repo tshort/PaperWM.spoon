@@ -119,6 +119,22 @@ PaperWM.window_filter = WindowFilter.new():setOverrideFilter({
     allowRoles = "AXStandardWindow"
 })
 
+-- default tags
+PaperWM.tags = {0, "comms", "web", "util", 1, 2, 3, 4, 5, 6, 7, 8, 9, "*"}
+
+function indexOf(array, value)
+    for i, v in ipairs(array) do
+        if v == value then
+            return i
+        end
+    end
+    return nil
+end
+
+function tagIndex(value)
+    return indexOf(PaperWM.tags, value)
+end
+
 -- number of pixels between windows
 PaperWM.window_gap = 4
 
@@ -166,7 +182,10 @@ local function updatemenu()
     for i, screen in ipairs(hs.screen.allScreens()) do
         title = title .. window_list[screen:id()].activespace
         if screen == hs.screen.mainScreen() then
-            title = title .. "-" .. index_table[hs.window.focusedWindow():id()].col
+            local idt = index_table[hs.window.focusedWindow():id()]
+            if idt.space == window_list[screen:id()].activespace then
+                title = title .. "-" .. idt.col
+            end
         end
         if i < #hs.screen.allScreens() then
             title = title .. ":"
@@ -378,8 +397,7 @@ end
 ---@param window Window|nil a window in the space
 function PaperWM:focusSpace(screenid, space, window)
     local screen_frame = hs.screen.find(screenid):frame()
-    print(screenid)
-    print(space)
+    print("space: ", space)
     if window_list[screenid][window_list[screenid].activespace] then
         for i, cols in ipairs(window_list[screenid][window_list[screenid].activespace]) do
             for _, wf in ipairs(cols) do
@@ -393,8 +411,6 @@ function PaperWM:focusSpace(screenid, space, window)
     for i, cols in ipairs(window_list[screenid][window_list[screenid].activespace]) do
         for _, wf in ipairs(cols) do
             if isvisible(wf.frame, screen_frame) then
-                -- print(hs.inspect(wf.win:title()))
-                -- print(hs.inspect(wf.win:frame()))
                 PaperWM:restoreWindow(wf)
             end
         end
@@ -599,7 +615,10 @@ function PaperWM:initWindows()
     for _, screen in pairs(hs.screen.allScreens()) do
         local screenid = screen:id()
         window_list[screenid] = {}
-        window_list[screenid].activespace = 1
+        for _, space in ipairs(PaperWM.tags) do
+            window_list[screenid][space] = {}
+        end
+        window_list[screenid].activespace = PaperWM.tags[1]
         for _, w in pairs(hs.window.filter.new(true):setScreens(screenid):getWindows()) do
             local space = self:addWindow(w)
         end 
@@ -706,12 +725,12 @@ function PaperWM:removeWindow(remove_window, skip_new_window_focus)
 
     -- update index table
     index_table[remove_window:id()] = nil
-    updateIndexTable(remove_index.screenid, remove_index.space, remove_index.space, remove_index.col)
+    updateIndexTable(remove_index.screenid, remove_index.space, remove_index.col)
 
     -- remove if space is empty
-    if #window_list[remove_index.screenid][remove_index.space] == 0 then
-        window_list[remove_index.screenid][remove_index.space] = nil
-    end
+    -- if #window_list[remove_index.screenid][remove_index.space] == 0 then
+    --     window_list[remove_index.screenid][remove_index.space] = nil
+    -- end
 
     return remove_index.space -- return space for removed window
 end
@@ -1138,39 +1157,35 @@ end
 ---@param direction Direction use Direction.UP or Direction.DOWN
 function PaperWM:incrementSpace(direction)
     local index = index_table[focused_window:id()]
-    if direction == Direction.UP and index.space > 1 then
-        self:focusSpace(index.screenid, index.space - 1)
+    if direction == Direction.UP and tagIndex(index.space) > 1 then
+        self:focusSpace(index.screenid, PaperWM.tags[tagIndex(index.space) - 1])
     end
-    if direction == Direction.DOWN and index.space < #(window_list[index.screenid]) then
-        self:focusSpace(index.screenid, index.space + 1)
+    if direction == Direction.DOWN and tagIndex(index.space) < #(window_list[index.screenid]) then
+        self:focusSpace(index.screenid, PaperWM.tags[tagIndex(index.space) + 1])
     end
 end
 
 function PaperWM:goUpSpace()
     local index = index_table[focused_window:id()]
-    if index.space > 1 then
-        self:focusSpace(index.screenid, index.space - 1)
+    if tagIndex(index.space) > 1 then
+        self:focusSpace(index.screenid, PaperWM.tags[tagIndex(index.space) - 1])
     end
 end
 function PaperWM:goDownSpace()
     local index = index_table[focused_window:id()]
-    if index.space < #(window_list[index.screenid]) then
-        self:focusSpace(index.screenid, index.space + 1)
+    if tagIndex(index.space) < #PaperWM.tags then
+        self:focusSpace(index.screenid, PaperWM.tags[tagIndex(index.space) + 1])
     end
 end
 function PaperWM:moveWindowUpSpace()
-    print("Up - index_table")
-    print(hs.inspect(index_table))
     local index = index_table[focused_window:id()]
-    if index.space > 1 then
-        self:moveWindowToSpace(index.screenid, index.space - 1)
+    if tagIndex(index.space) > 1 then
+        self:moveWindowToSpace(index.screenid, PaperWM.tags[tagIndex(index.space) - 1])
     end
 end
 function PaperWM:moveWindowDownSpace()
-    print("Down - index_tble")
-    print(hs.inspect(index_table))
     local index = index_table[focused_window:id()]
-    self:moveWindowToSpace(index.screenid, index.space + 1)
+    self:moveWindowToSpace(index.screenid, PaperWM.tags[tagIndex(index.space) + 1])
 end
 
 ---move focused window to a Mission Control space
