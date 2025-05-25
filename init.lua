@@ -1167,25 +1167,29 @@ end
 
 function PaperWM:goUpSpace()
     local index = index_table[focused_window:id()]
-    if tagIndex(index.space) > 1 then
-        self:focusSpace(index.screenid, PaperWM.tags[tagIndex(index.space) - 1])
+    local space = window_list[index.screenid].activespace
+    if tagIndex(space) > 1 then
+        self:focusSpace(index.screenid, PaperWM.tags[tagIndex(space) - 1])
     end
 end
 function PaperWM:goDownSpace()
     local index = index_table[focused_window:id()]
-    if tagIndex(index.space) < #PaperWM.tags then
-        self:focusSpace(index.screenid, PaperWM.tags[tagIndex(index.space) + 1])
+    local space = window_list[index.screenid].activespace
+    if tagIndex(space) < #PaperWM.tags then
+        self:focusSpace(index.screenid, PaperWM.tags[tagIndex(space) + 1])
     end
 end
 function PaperWM:moveWindowUpSpace()
     local index = index_table[focused_window:id()]
-    if tagIndex(index.space) > 1 then
-        self:moveWindowToSpace(index.screenid, PaperWM.tags[tagIndex(index.space) - 1])
+    local space = window_list[index.screenid].activespace
+    if tagIndex(space) > 1 then
+        self:moveWindowToSpace(index.screenid, PaperWM.tags[tagIndex(space) - 1])
     end
 end
 function PaperWM:moveWindowDownSpace()
     local index = index_table[focused_window:id()]
-    self:moveWindowToSpace(index.screenid, PaperWM.tags[tagIndex(index.space) + 1])
+    local space = window_list[index.screenid].activespace
+    self:moveWindowToSpace(index.screenid, PaperWM.tags[tagIndex(space) + 1])
 end
 
 ---move focused window to a Mission Control space
