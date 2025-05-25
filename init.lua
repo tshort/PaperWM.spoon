@@ -120,7 +120,7 @@ PaperWM.window_filter = WindowFilter.new():setOverrideFilter({
 })
 
 -- default tags
-PaperWM.tags = {0, "comms", "web", "util", 1, 2, 3, 4, 5, 6, 7, 8, 9, "*"}
+PaperWM.tags = {"comms", "web", "util", 1, 2, 3, 4, 5, 6, 7, 8, 9}
 
 function indexOf(array, value)
     for i, v in ipairs(array) do
@@ -129,10 +129,6 @@ function indexOf(array, value)
         end
     end
     return nil
-end
-
-function tagIndex(value)
-    return indexOf(PaperWM.tags, value)
 end
 
 -- number of pixels between windows
@@ -612,13 +608,18 @@ end
 function PaperWM:initWindows()
     -- find screens and windows in screens
     -- assign these to the first space on each screen
-    for _, screen in pairs(hs.screen.allScreens()) do
+    for k, screen in pairs(hs.screen.allScreens()) do
         local screenid = screen:id()
         window_list[screenid] = {}
-        for _, space in ipairs(PaperWM.tags) do
-            window_list[screenid][space] = {}
+        window_list[screenid].tags = {"S" .. k}
+        if screenid == hs.screen.primaryScreen():id() then
+            for _, space in ipairs(PaperWM.tags) do
+                table.insert(window_list[screenid].tags, space)
+                window_list[screenid][space] = {}
+            end
+            table.insert(window_list[screenid].tags, "*")
         end
-        window_list[screenid].activespace = PaperWM.tags[1]
+        window_list[screenid].activespace = window_list[screenid].tags[1]
         for _, w in pairs(hs.window.filter.new(true):setScreens(screenid):getWindows()) do
             local space = self:addWindow(w)
         end 
@@ -1157,39 +1158,52 @@ end
 ---@param direction Direction use Direction.UP or Direction.DOWN
 function PaperWM:incrementSpace(direction)
     local index = index_table[focused_window:id()]
-    if direction == Direction.UP and tagIndex(index.space) > 1 then
-        self:focusSpace(index.screenid, PaperWM.tags[tagIndex(index.space) - 1])
+    local space = window_list[index.screenid].activespace
+    local tags = window_list[index.screenid].tags
+    local tagidx = indexOf(tags, space)
+    if direction == Direction.UP and tagidx > 1 then
+        self:focusSpace(index.screenid, tags[tagidx - 1])
     end
-    if direction == Direction.DOWN and tagIndex(index.space) < #(window_list[index.screenid]) then
-        self:focusSpace(index.screenid, PaperWM.tags[tagIndex(index.space) + 1])
+    if direction == Direction.DOWN and tagidx < #(window_list[index.screenid]) then
+        self:focusSpace(index.screenid, tags[tagidx + 1])
     end
 end
 
 function PaperWM:goUpSpace()
     local index = index_table[focused_window:id()]
     local space = window_list[index.screenid].activespace
-    if tagIndex(space) > 1 then
-        self:focusSpace(index.screenid, PaperWM.tags[tagIndex(space) - 1])
+    local tags = window_list[index.screenid].tags
+    local tagidx = indexOf(tags, space)
+    if tagidx > 1 then
+        self:focusSpace(index.screenid, tags[tagidx - 1])
     end
 end
 function PaperWM:goDownSpace()
     local index = index_table[focused_window:id()]
     local space = window_list[index.screenid].activespace
-    if tagIndex(space) < #PaperWM.tags then
-        self:focusSpace(index.screenid, PaperWM.tags[tagIndex(space) + 1])
+    local tags = window_list[index.screenid].tags
+    local tagidx = indexOf(tags, space)
+    if tagidx < #tags then
+        self:focusSpace(index.screenid, tags[tagidx + 1])
     end
 end
 function PaperWM:moveWindowUpSpace()
     local index = index_table[focused_window:id()]
     local space = window_list[index.screenid].activespace
-    if tagIndex(space) > 1 then
-        self:moveWindowToSpace(index.screenid, PaperWM.tags[tagIndex(space) - 1])
+    local tags = window_list[index.screenid].tags
+    local tagidx = indexOf(tags, index.space)
+    if tagidx > 1 then
+        self:moveWindowToSpace(index.screenid, tags[tagidx - 1])
     end
 end
 function PaperWM:moveWindowDownSpace()
     local index = index_table[focused_window:id()]
     local space = window_list[index.screenid].activespace
-    self:moveWindowToSpace(index.screenid, PaperWM.tags[tagIndex(space) + 1])
+    local tags = window_list[index.screenid].tags
+    local tagidx = indexOf(tags, index.space)
+    if tagidx < #tags then
+        self:moveWindowToSpace(index.screenid, tags[tagidx + 1])
+    end
 end
 
 ---move focused window to a Mission Control space
