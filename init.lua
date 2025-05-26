@@ -164,7 +164,6 @@ window_list = {} -- 3D array of tiles in order of [screenid][space][x][y]
                        -- also stores 
                        --     [screenid].activespace
                        --     [screenid][space].focusedwindow
-                       --     [screenid][space].visiblewindows
                        --     [screenid][space][x][y].win
                        --     [screenid][space][x][y].frame
                        
@@ -177,12 +176,12 @@ local function updatemenu()
     local title = ""
     for i, screen in ipairs(hs.screen.allScreens()) do
         title = title .. window_list[screen:id()].activespace
-        if screen == hs.screen.mainScreen() then
-            local idt = index_table[hs.window.focusedWindow():id()]
-            if idt.space == window_list[screen:id()].activespace then
-                title = title .. "-" .. idt.col
-            end
-        end
+        -- if screen == hs.screen.mainScreen() then
+        --     local idt = index_table[hs.window.focusedWindow():id()]
+        --     if idt.space == window_list[screen:id()].activespace then
+        --         title = title .. "-" .. idt.col
+        --     end
+        -- end
         if i < #hs.screen.allScreens() then
             title = title .. ":"
         end
@@ -392,6 +391,7 @@ end
 ---@param space Space
 ---@param window Window|nil a window in the space
 function PaperWM:focusSpace(screenid, space, window)
+    window_list.activescreenid = screenid
     local screen_frame = hs.screen.find(screenid):frame()
     if window_list[screenid][window_list[screenid].activespace] then
         for i, cols in ipairs(window_list[screenid][window_list[screenid].activespace]) do
@@ -521,6 +521,7 @@ end
 ---tile all column in a space by moving and resizing windows
 ---@param space Space
 function PaperWM:tileSpace(screen, space)
+    print("tiling screen: ", screen, " space: ", space)
     -- if not space or Spaces.spaceType(space) ~= "user" then
     --     self.logger.e("current space invalid")
     --     return
@@ -612,6 +613,7 @@ function PaperWM:initWindows()
         window_list[screenid] = {}
         window_list[screenid].__tags = {"S" .. k}
         if screenid == hs.screen.primaryScreen():id() then
+            window_list.activescreenid = screenid
             for _, space in ipairs(PaperWM.tags) do
                 table.insert(window_list[screenid].__tags, space)
                 window_list[screenid][space] = {}
@@ -1206,7 +1208,7 @@ end
 ---move focused window to a Mission Control space
 ---@param index number ID for space
 ---@param window Window|nil optional window to move
-function PaperWM:moveWindowToSpace(screenid, space, window)
+function PaperWM:moveWindowToSpace(screenid, space, window, stay)
     local focused_window = window or Window.focusedWindow()
     if not focused_window then
         self.logger.d("focused window not found")
@@ -1234,9 +1236,30 @@ function PaperWM:moveWindowToSpace(screenid, space, window)
     local new_index = index_table[focused_window:id()]
     self:tileSpace(hs.screen.find(new_index.screenid), new_index.space)
     window_list[screenid][space].focusedwindow = focused_window:id()
-    self:focusSpace(screenid, space, focused_window)
+    if stay then
+        self:focusSpace(screenid, old_index.space)
+    else
+        self:focusSpace(screenid, space, focused_window)
+    end
 end
 
+function PaperWM:moveWindowToScratchSpace()
+    PaperWM:moveWindowToSpace(hs.screen.primaryScreen():id(), "*", focused_window, true)
+end
+
+function PaperWM:moveWindowsFromScratchSpace()
+    local screenid = window_list.activescreenid
+    local space = window_list[screenid].activespace
+    for i, cols in ipairs(copy(window_list[hs.screen.primaryScreen():id()]["*"])) do
+        for _, wf in ipairs(cols) do
+            PaperWM:moveWindowToSpace(screenid, space, wf.win)
+        end
+    end
+end
+
+function PaperWM:focusScratchSpace()
+    PaperWM:focusSpace(hs.screen.primaryScreen():id(), "*")
+end
 
 ---move and resize a window to the coordinates specified by the frame
 ---disable watchers while window is moving and re-enable after
@@ -1301,6 +1324,9 @@ PaperWM.actions = {
     down_space = partial(PaperWM.goDownSpace, PaperWM),
     move_up_space = partial(PaperWM.moveWindowUpSpace, PaperWM),
     move_down_space = partial(PaperWM.moveWindowDownSpace, PaperWM),
+    move_to_scratch_space = partial(PaperWM.moveWindowToScratchSpace, PaperWM),
+    move_from_scratch_space = partial(PaperWM.moveWindowsFromScratchSpace, PaperWM),
+    focus_scratch_space = partial(PaperWM.focusScratchSpace, PaperWM),
     stop_events = partial(PaperWM.stop, PaperWM),
     refresh_windows = partial(PaperWM.initWindows, PaperWM),
     toggle_floating = partial(PaperWM.toggleFloating, PaperWM),
@@ -1322,24 +1348,6 @@ PaperWM.actions = {
     barf_out = partial(PaperWM.barfWindow, PaperWM),
     switch_space_u = partial(PaperWM.incrementSpace, PaperWM, Direction.UP),
     switch_space_d = partial(PaperWM.incrementSpace, PaperWM, Direction.DOWN),
-    switch_space_1 = partial(PaperWM.switchToSpace, PaperWM, 1),
-    switch_space_2 = partial(PaperWM.switchToSpace, PaperWM, 2),
-    switch_space_3 = partial(PaperWM.switchToSpace, PaperWM, 3),
-    switch_space_4 = partial(PaperWM.switchToSpace, PaperWM, 4),
-    switch_space_5 = partial(PaperWM.switchToSpace, PaperWM, 5),
-    switch_space_6 = partial(PaperWM.switchToSpace, PaperWM, 6),
-    switch_space_7 = partial(PaperWM.switchToSpace, PaperWM, 7),
-    switch_space_8 = partial(PaperWM.switchToSpace, PaperWM, 8),
-    switch_space_9 = partial(PaperWM.switchToSpace, PaperWM, 9),
-    move_window_1 = partial(PaperWM.moveWindowToSpace, PaperWM, 1),
-    move_window_2 = partial(PaperWM.moveWindowToSpace, PaperWM, 2),
-    move_window_3 = partial(PaperWM.moveWindowToSpace, PaperWM, 3),
-    move_window_4 = partial(PaperWM.moveWindowToSpace, PaperWM, 4),
-    move_window_5 = partial(PaperWM.moveWindowToSpace, PaperWM, 5),
-    move_window_6 = partial(PaperWM.moveWindowToSpace, PaperWM, 6),
-    move_window_7 = partial(PaperWM.moveWindowToSpace, PaperWM, 7),
-    move_window_8 = partial(PaperWM.moveWindowToSpace, PaperWM, 8),
-    move_window_9 = partial(PaperWM.moveWindowToSpace, PaperWM, 9)
 }
 
 ---bind userdefined hotkeys to PaperWM actions
@@ -1361,3 +1369,8 @@ return PaperWM
 -- DONE Menubar
 -- DONE Bug with windows stached on the right that are not fully off screen
 -- Bug with a blocking gap between left and right windows - move jumps the gap
+-- Allow windows to be in multiple spaces: need to remove or change index_table
+-- Add move_to_scratch function
+-- Add move_from_scratch function
+-- Add functions to move spaces
+
