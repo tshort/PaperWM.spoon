@@ -198,6 +198,14 @@ function PaperWM:stashWindow(windowframe)
     windowframe.frame = frame2
 end        
 
+function PaperWM:hideWindow(window)
+    local idx = index_table[window:id()]
+    local screenframe = window:screen():frame()
+    local frame = window:frame()
+    frame.x = screenframe.x2 - 1
+    self:moveWindow(window, frame)
+end        
+
 ---restore a window
 ---@param windowframe window to move
 ---@return nil
@@ -378,13 +386,10 @@ function PaperWM:focusSpace(screenid, space, window)
     end
     window_list.activescreenid = screenid
     local screen_frame = hs.screen.find(screenid):frame()
-    print("focusSpace ", space)
     if window_list[screenid].spaces[window_list[screenid].activespace] then
         for _, cols in ipairs(window_list[screenid].spaces[window_list[screenid].activespace]) do
             for _, wf in ipairs(cols) do
                 if isvisible(wf.win:frame(), screen_frame) then
-                    print("Stashing...")
-                    print(hs.inspect(wf.win))
                     PaperWM:stashWindow(wf)
                 end
             end
@@ -515,7 +520,6 @@ end
 ---tile all column in a space by moving and resizing windows
 ---@param space Space
 function PaperWM:tileSpace(screen, space)
-    print("tiling screen: ", screen:id(), " space: ", space)
     -- if not space or Spaces.spaceType(space) ~= "user" then
     --     self.logger.e("current space invalid")
     --     return
@@ -556,7 +560,6 @@ function PaperWM:tileSpace(screen, space)
         anchor_frame.x = canvas.x2 - anchor_frame.w
     end
 
-    print(hs.inspect(anchor_index))
     -- adjust anchor window column
     local column = getColumn(screen:id(), space, anchor_index.col)
     if not column then
@@ -629,10 +632,9 @@ function PaperWM:initWindows()
             -- self:tileSpace(screen, space)
             for i, col in ipairs(cols) do
                 for _, wf in ipairs(col) do
-                    print(space .. i)
-                    -- if isvisible(wf.win:frame(), screen_frame) then
+                    if isvisible(wf.win:frame(), screen_frame) then
                         PaperWM:stashWindow(wf)
-                    -- end
+                    end
                 end
             end
         end 
@@ -657,11 +659,21 @@ function PaperWM:addWindow(add_window, screenid, space)
     -- end
     -- check if window is already in window list
     if index_table[add_window:id()] then return end
+    local window_stay = nil
     if not screenid and not space then
         local defaultspace = PaperWM.defaultAppSpace[add_window:application():title()]  
         if defaultspace then
-            screenid = PaperWM:findScreenIDWithSpace(defaultspace)
-            space = defaultspace
+            if focused_window then
+                local same_app = focused_window:application():title() == add_window:application():title()
+                if same_app then
+                    screenid = PaperWM:findScreenIDWithSpace(defaultspace)
+                    space = defaultspace
+                    window_stay = copy(focused_window)
+                end
+            else
+                screenid = PaperWM:findScreenIDWithSpace(defaultspace)
+                space = defaultspace
+            end
         end
     end
     screenid = screenid or add_window:screen():id()
@@ -706,7 +718,9 @@ function PaperWM:addWindow(add_window, screenid, space)
         end, self)
     watcher:start({ Watcher.windowMoved, Watcher.windowResized })
     ui_watchers[add_window:id()] = watcher
-
+    if window_stay then
+        window_stay:focus()
+    end
     return space
 end
 
@@ -1228,7 +1242,6 @@ end
 ---@param index number ID for space
 ---@param window Window|nil optional window to move
 function PaperWM:moveWindowToSpace(screenid, space, window, stay)
-    print("moveWindowToSpace")
     local focused_window = window or Window.focusedWindow()
     if not focused_window then
         self.logger.d("focused window not found")
@@ -1250,6 +1263,7 @@ function PaperWM:moveWindowToSpace(screenid, space, window, stay)
     else
         window_list[old_index.screenid].spaces[old_index.space].focusedwindow = nil
     end
+    self:hideWindow(focused_window)
     self:removeWindow(focused_window, true)
     self:tileSpace(hs.screen.find(old_index.screenid), old_index.space)
     self:addWindow(focused_window, screenid, space)
@@ -1277,6 +1291,23 @@ function PaperWM:moveWindowsFromScratchSpace()
     end
 end
 
+function PaperWM:moveWindowsRightToScratchSpace()
+    local screenid = window_list.activescreenid
+    local space = window_list[screenid].activespace
+    local focused_window = Window.focusedWindow()
+    if not focused_window then
+        return
+    end
+    local focused_col = index_table[focused_window:id()].col
+    for col, cols in ipairs(copy(window_list[screenid].spaces[space])) do
+        for row, wf in ipairs(cols) do
+            if col >= focused_col then
+                PaperWM:moveWindowToSpace(hs.screen.primaryScreen():id(), "*", wf.win, true)
+            end
+        end
+    end
+end
+
 function PaperWM:focusScratchSpace()
     PaperWM:focusSpace(hs.screen.primaryScreen():id(), "*")
 end
@@ -1285,6 +1316,27 @@ function PaperWM:moveWindowTo(space, window, stay)
     local screenid = PaperWM:findScreenIDWithSpace(space)
     if screenid then
         PaperWM:moveWindowToSpace(screenid, space, window, stay)
+    end
+end
+
+function PaperWM:closeWindow()
+    local win = Window.focusedWindow()
+    if win then
+        local app = win:application()
+        win:close()
+        if #app:allWindows() == 0 then
+            app:kill()
+        end
+    end
+end
+
+function PaperWM:closeWindowsInSpace()
+    local screenid = window_list.activescreenid
+    local space = window_list[screenid].activespace
+    for col, cols in ipairs(copy(window_list[screenid].spaces[space])) do
+        for row, wf in ipairs(cols) do
+            PaperWM:closeWindow(wf.win)
+        end
     end
 end
 
@@ -1360,6 +1412,7 @@ PaperWM.actions = {
     move_to_scratch_space = partial(PaperWM.moveWindowToScratchSpace, PaperWM),
     move_from_scratch_space = partial(PaperWM.moveWindowsFromScratchSpace, PaperWM),
     focus_scratch_space = partial(PaperWM.focusScratchSpace, PaperWM),
+    move_right_to_scratch_space = partial(PaperWM.moveWindowsRightToScratchSpace, PaperWM),
     stop_events = partial(PaperWM.stop, PaperWM),
     refresh_windows = partial(PaperWM.initWindows, PaperWM),
     toggle_floating = partial(PaperWM.toggleFloating, PaperWM),
@@ -1371,11 +1424,18 @@ PaperWM.actions = {
     down_space = partial(PaperWM.goDownSpace, PaperWM),
     move_up_space = partial(PaperWM.moveWindowUpSpace, PaperWM),
     move_down_space = partial(PaperWM.moveWindowDownSpace, PaperWM),
+    close_window = partial(PaperWM.closeWindow, PaperWM),
+    close_windows_in_space = partial(PaperWM.closeWindowsInSpace, PaperWM),
     focus_space_0 = partial(PaperWM.focusSpace, PaperWM, hs.screen.mainScreen():id(), "S" .. hs.screen.mainScreen():id()),
     focus_space_1 = partial(PaperWM.focusSpace, PaperWM, nil, 1),
     focus_space_2 = partial(PaperWM.focusSpace, PaperWM, nil, 2),
     focus_space_3 = partial(PaperWM.focusSpace, PaperWM, nil, 3),
     focus_space_4 = partial(PaperWM.focusSpace, PaperWM, nil, 4),
+    focus_space_5 = partial(PaperWM.focusSpace, PaperWM, nil, 5),
+    focus_space_6 = partial(PaperWM.focusSpace, PaperWM, nil, 6),
+    focus_space_7 = partial(PaperWM.focusSpace, PaperWM, nil, 7),
+    focus_space_8 = partial(PaperWM.focusSpace, PaperWM, nil, 8),
+    focus_space_9 = partial(PaperWM.focusSpace, PaperWM, nil, 9),
     swap_left = partial(PaperWM.swapWindows, PaperWM, Direction.LEFT),
     swap_right = partial(PaperWM.swapWindows, PaperWM, Direction.RIGHT),
     swap_up = partial(PaperWM.swapWindows, PaperWM, Direction.UP),
@@ -1405,7 +1465,7 @@ return PaperWM
 
 -- TODO
 
--- Fix left and right when at end
+-- DONE Fix left and right when at end
 -- DONE Change focusedwindow for the space where a window was moved out of
 -- DONE Fix alt-tab to another space
 -- DONE Menubar
@@ -1415,4 +1475,7 @@ return PaperWM
 -- DONE Add move_to_scratch function
 -- DONE Add move_from_scratch function
 -- Add functions to move spaces
-
+-- Close windows in space
+-- DONE Move right windows to scratch
+-- DONE Switch to `util` not working key d
+-- Close window and close app if it's the last one
