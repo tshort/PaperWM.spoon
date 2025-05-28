@@ -142,12 +142,12 @@ local Direction <const> = {
 local IsFloatingKey <const> = 'PaperWM_is_floating'
 
 -- array of windows sorted from left to right
-window_list = {} -- 3D array of tiles in order of [screenid][space][x][y]
+window_list = {} -- 3D array of tiles in order of [screenid].spaces[space][x][y]
                        -- also stores 
                        --     [screenid].activespace
-                       --     [screenid][space].focusedwindow
-                       --     [screenid][space][x][y].win
-                       --     [screenid][space][x][y].frame
+                       --     [screenid].spaces[space].focusedwindow
+                       --     [screenid].spaces[space][x][y].win
+                       --     [screenid].spaces[space][x][y].frame
                        
 index_table = {} -- dictionary of {screenid, space, x, y} with window id for keys
 local ui_watchers = {} -- dictionary of uielement watchers with window id for keys
@@ -402,6 +402,11 @@ function PaperWM:focusSpace(screenid, space, window)
         window:focus()
     elseif window_list[screenid].spaces[space].focusedwindow then
         hs.window.find(window_list[screenid].spaces[space].focusedwindow):focus()
+    else
+        local w = getFirstVisibleWindow(window_list[screenid].spaces[space], hs.screen.find(screenid))
+        if w then 
+            w:focus()
+        end
     end
     PaperWM:tileSpace(hs.screen.find(screenid), space)
     updatemenu()
