@@ -294,6 +294,9 @@ local pending_window = nil ---@type Window|nil
 ---@param event string name of the event
 ---@param self PaperWM
 local function windowEventHandler(window, event, self)
+    if not window then
+        return
+    end
     self.logger.df("%s for [%s] id: %d", event, window, window and window:id() or -1)
 
     --[[ When a new window is created, We first get a windowVisible event but
@@ -1417,6 +1420,45 @@ function PaperWM:toggleFloating()
     end
 end
 
+function PaperWM:chooseWindow()
+    local windows = hs.window.visibleWindows()
+    local chooserData = {}
+
+    for screenid, wl in ipairs(window_list) do
+        for _, tag in ipairs(wl.tags) do
+            local cols = wl.spaces[tag]
+            for _, col in ipairs(cols) do
+                for _, wf in ipairs(col) do
+                    local win = wf.win
+                    local app = win:application()
+                    local icon = hs.image.imageFromAppBundle(app:bundleID())
+                    table.insert(chooserData, {
+                        text = win:title(),
+                        -- subText = app:name(),
+                        subText = tag,
+                        image = icon,
+                        uuid = win:id()  -- We use the window ID to identify the selected window
+                    })
+                end
+            end
+        end
+    end
+    local screenFrame = hs.screen.mainScreen():frame()
+    local rowHeight = 55  
+    local maxRows = math.floor(screenFrame.h / rowHeight)
+
+    local chooser = hs.chooser.new(function(choice)
+        if not choice then return end
+        local targetWin = hs.window.get(choice.uuid)
+        if targetWin then
+            targetWin:focus()
+        end
+    end):searchSubText(true):rows(maxRows)
+
+    chooser:choices(chooserData)
+    chooser:show()
+end
+
 ---supported window movement actions
 PaperWM.actions = {
     move_to_scratch_space = partial(PaperWM.moveWindowToScratchSpace, PaperWM),
@@ -1458,6 +1500,7 @@ PaperWM.actions = {
     reverse_cycle_height = partial(PaperWM.cycleWindowSize, PaperWM, Direction.HEIGHT, Direction.DESCENDING),
     slurp_in = partial(PaperWM.slurpWindow, PaperWM),
     barf_out = partial(PaperWM.barfWindow, PaperWM),
+    choose_window = partial(PaperWM.chooseWindow, PaperWM),
     -- switch_space_u = partial(PaperWM.incrementSpace, PaperWM, Direction.UP),
     -- switch_space_d = partial(PaperWM.incrementSpace, PaperWM, Direction.DOWN),
 }
