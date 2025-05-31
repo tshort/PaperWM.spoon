@@ -155,6 +155,7 @@ index_table = {} -- dictionary of {screenid, space, x, y} with window id for key
 local ui_watchers = {} -- dictionary of uielement watchers with window id for keys
 local is_floating = {} -- dictionary of boolean with window id for keys
 menubar = hs.menubar.new(true, "spaceindicator")
+last_focused_app = "" -- stores the name of the last app with focus
 
 local function updatemenu()
     local title = ""
@@ -333,6 +334,14 @@ local function windowEventHandler(window, event, self)
             idx_prior = index_table[focused_window:id()]
         end
         focused_window = window
+        local focused_app = window:application():title()
+        Timer.doAfter(2,
+            -- kludgy way to check to make sure the last_focused_app wasn't triggered automatically
+            function()
+                if focused_window:application():title() == focused_app then
+                    last_focused_app = focused_app
+                end
+            end)
         if idx then
             -- hs.alert.show(idx.col)
             updatemenu()
@@ -370,7 +379,6 @@ local function windowEventHandler(window, event, self)
     elseif event == "AXWindowMoved" or event == "AXWindowResized" then
         -- space = Spaces.windowSpaces(window)[1]
     elseif event == "windowDestroyed" and idx then
-        print("windowDestroyed")
         window_list[idx.screenid].spaces[idx.space].focusedwindow = nil
     end
 
@@ -539,7 +547,6 @@ function PaperWM:tileSpace(screen, space)
     --     return
     -- end
 
-    print("tiling")
     -- if focused window is in space, tile from that
     local focused_window = Window.focusedWindow()
     local anchor_window = nil
@@ -581,8 +588,6 @@ function PaperWM:tileSpace(screen, space)
     local column = getColumn(screen:id(), space, anchor_index.col)
     if not column then
         self.logger.e("no anchor window column")
-        print(space)
-        print(hs.inspect(anchor_index))
         return
     end
 
@@ -681,11 +686,10 @@ function PaperWM:addWindow(add_window, screenid, space)
     local window_stay = nil
     if not screenid and not space then
         local defaultspace = PaperWM.defaultAppSpace[add_window:application():title()]  
-        local same_app = focused_window and focused_window:application():title() == add_window:application():title()
+        local same_app = last_focused_app == add_window:application():title()
         if defaultspace and not same_app then    -- open next to the original
             screenid = PaperWM:findScreenIDWithSpace(defaultspace)
             space = defaultspace
-            print("same app")
         end
         if same_app and indexOf(PaperWM.appsOpenInBackground, focused_window:application():title()) then
             window_stay = copy(focused_window)
@@ -734,10 +738,8 @@ function PaperWM:addWindow(add_window, screenid, space)
     watcher:start({ Watcher.windowMoved, Watcher.windowResized })
     ui_watchers[add_window:id()] = watcher
     if window_stay then
-        print("stay")
         window_stay:focus()
     else 
-        print("addWindow")
         window_list[screenid].spaces[space].focusedwindow = add_window:id()
         add_window:focus()
     end
