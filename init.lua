@@ -366,6 +366,9 @@ local function windowEventHandler(window, event, self)
         space = self:removeWindow(window, true) -- don't focus new window if fullscreened
     elseif event == "AXWindowMoved" or event == "AXWindowResized" then
         -- space = Spaces.windowSpaces(window)[1]
+    elseif event == "windowDestroyed" and idx then
+        print("windowDestroyed")
+        window_list[idx.screenid].spaces[idx.space].focusedwindow = nil
     end
 
     if space then 
@@ -411,7 +414,9 @@ function PaperWM:focusSpace(screenid, space, window)
     end
     if window then
         window:focus()
-    elseif window_list[screenid].spaces[space].focusedwindow then
+    elseif window_list[screenid].spaces[space].focusedwindow and 
+           #window_list[screenid].spaces[space] > 0 and 
+           hs.window.find(window_list[screenid].spaces[space].focusedwindow) then
         hs.window.find(window_list[screenid].spaces[space].focusedwindow):focus()
     else
         local w = getFirstVisibleWindow(window_list[screenid].spaces[space], hs.screen.find(screenid))
@@ -1480,7 +1485,7 @@ return PaperWM
 -- DONE Add move_to_scratch function
 -- DONE Add move_from_scratch function
 -- Add functions to move spaces
--- Close windows in space
+-- DONE Close windows in space
 -- DONE Move right windows to scratch
 -- DONE Switch to `util` not working key d
--- Close window and close app if it's the last one
+-- DONE Close window and close app if it's the last one
