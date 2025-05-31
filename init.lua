@@ -733,6 +733,8 @@ function PaperWM:addWindow(add_window, screenid, space)
     ui_watchers[add_window:id()] = watcher
     if window_stay then
         window_stay:focus()
+    else 
+        add_window:focus()
     end
     return space
 end
