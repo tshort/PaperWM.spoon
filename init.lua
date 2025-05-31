@@ -539,6 +539,7 @@ function PaperWM:tileSpace(screen, space)
     --     return
     -- end
 
+    print("tiling")
     -- if focused window is in space, tile from that
     local focused_window = Window.focusedWindow()
     local anchor_window = nil
@@ -684,6 +685,7 @@ function PaperWM:addWindow(add_window, screenid, space)
         if defaultspace and not same_app then    -- open next to the original
             screenid = PaperWM:findScreenIDWithSpace(defaultspace)
             space = defaultspace
+            print("same app")
         end
         if same_app and indexOf(PaperWM.appsOpenInBackground, focused_window:application():title()) then
             window_stay = copy(focused_window)
@@ -732,8 +734,11 @@ function PaperWM:addWindow(add_window, screenid, space)
     watcher:start({ Watcher.windowMoved, Watcher.windowResized })
     ui_watchers[add_window:id()] = watcher
     if window_stay then
+        print("stay")
         window_stay:focus()
     else 
+        print("addWindow")
+        window_list[screenid].spaces[space].focusedwindow = add_window:id()
         add_window:focus()
     end
     return space
