@@ -1,5 +1,51 @@
 # PaperWM.spoon
 
+# Fork
+
+The main purpose of this fork is to support virtual spaces like [Aerospace](https://github.com/nikitabobko/AeroSpace). Here are the main differences relative to the original.
+
+All spaces are named. You can set up your own as follows:
+
+```lua
+PaperWM.tags = {"comms", "web", "util", "code", 1, 2, 3, 4, 5, 6, 7, 8, 9}
+```
+
+Every display has a dedicated space called `S1`, `S2`, ... The primary screen also has a scratch space `*`, mainly used for moving around windows.
+
+Several commands are provided to switch spaces, including
+`focus_space_0`, `focus_space_1`, `focus_space_2`, `focus_space_3`, `focus_space_4`, `focus_space_5`, `focus_space_6`, `focus_space_7`, `focus_space_8`,  and`focus_space_9`.
+Custom switching commands can be added as follows:
+
+```lua
+PaperWM.actions["focus_space_comms"] = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, nil, "comms")
+```
+
+You can define defaults for where apps open in spaces using the `defaultAppSpace` object. Each key is the application name, and the value is the name of the space. The `appsOpenInBackground` specifies apps where you want new windows to open in the "background" (right next to the original). The original window maintains focus. This is handy for browsers where you often want to open pages in the background. Here are examples of both.
+
+```lua
+PaperWM.defaultAppSpace = {
+    ["Microsoft Outlook"] = "comms", Slack = "comms", 
+    Finder = "util", Ghostty = "util", Terminal = "util", 
+    Firefox = "web", Safari = "web", ["Google Chrome"] = "web", qutebrowser = "web",
+    Code = "code", 
+}
+PaperWM.appsOpenInBackground = {
+    "Firefox", "Safari", "Google Chrome"
+}
+```
+
+Here are new or changed commands:
+
+- `move_to_scratch_space`--Move the current window to the scratch space. The scratch space (labeled "*") is the last space on the primary screen. Typically bound to meta-Y (yank).
+- `move_from_scratch_space`--Move all windows from the scratch space to the current space. The scratch space makes it easy to move windows around. Yank multiple windows, switch to a new space then paste. Typically bound to meta-P (paste).
+- `focus_scratch_space`--Switch to the scratch space.
+- `move_right_to_scratch_space`--Move the current window and all windows to the right to the scratch space. 
+- `focus_up`/`focus_down`--These now move up and down a space if at the top/bottom of a column.
+- `close_window`--The same as cmd-W, except if it's the last window, it also closes the application.
+- `close_windows_in_space`--Close all windows in the space.
+
+# Original PaperWM readme
+
 Tiled scrollable window manager for MacOS. Inspired by
 [PaperWM](https://github.com/paperwm/PaperWM).
 
