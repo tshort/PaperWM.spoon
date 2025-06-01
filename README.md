@@ -36,11 +36,13 @@ PaperWM.appsOpenInBackground = {
 
 Here are new or changed commands:
 
+
 - `move_to_scratch_space`--Move the current window to the scratch space. The scratch space (labeled "*") is the last space on the primary screen. Typically bound to meta-Y (yank).
 - `move_from_scratch_space`--Move all windows from the scratch space to the current space. The scratch space makes it easy to move windows around. Yank multiple windows, switch to a new space then paste. Typically bound to meta-P (paste).
 - `focus_scratch_space`--Switch to the scratch space.
 - `move_right_to_scratch_space`--Move the current window and all windows to the right to the scratch space. 
-- `focus_up`/`focus_down`--These now move up and down a space if at the top/bottom of a column.
+- `focus_up`/`focus_down`--These now change focus up and down a space if at the top/bottom of a column.
+- `swap_*`--These were renamed to `move_*`. These now move windows up and down a space if at the top/bottom of a column. 
 - `close_window`--The same as cmd-W, except if it's the last window, it also closes the application.
 - `close_windows_in_space`--Close all windows in the space.
 

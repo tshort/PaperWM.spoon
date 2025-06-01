@@ -76,10 +76,10 @@ PaperWM.default_hotkeys = {
     focus_right          = { { "alt", "cmd" }, "right" },
     focus_up             = { { "alt", "cmd" }, "up" },
     focus_down           = { { "alt", "cmd" }, "down" },
-    swap_left            = { { "alt", "cmd", "shift" }, "left" },
-    swap_right           = { { "alt", "cmd", "shift" }, "right" },
-    swap_up              = { { "alt", "cmd", "shift" }, "up" },
-    swap_down            = { { "alt", "cmd", "shift" }, "down" },
+    move_left            = { { "alt", "cmd", "shift" }, "left" },
+    move_right           = { { "alt", "cmd", "shift" }, "right" },
+    move_up              = { { "alt", "cmd", "shift" }, "up" },
+    move_down            = { { "alt", "cmd", "shift" }, "down" },
     center_window        = { { "alt", "cmd" }, "c" },
     full_width           = { { "alt", "cmd" }, "f" },
     cycle_width          = { { "alt", "cmd" }, "r" },
@@ -88,8 +88,6 @@ PaperWM.default_hotkeys = {
     reverse_cycle_height = { { "ctrl", "alt", "cmd", "shift" }, "r" },
     slurp_in             = { { "alt", "cmd" }, "i" },
     barf_out             = { { "alt", "cmd" }, "o" },
-    switch_space_l       = { { "alt", "cmd" }, "," },
-    switch_space_r       = { { "alt", "cmd" }, "." },
 }
 
 
@@ -821,15 +819,14 @@ function PaperWM:focusWindow(direction, focused_index)
     if direction == Direction.LEFT or direction == Direction.RIGHT then
         -- walk down column, looking for match in neighbor column
         for row = focused_index.row, 1, -1 do
-            print(focused_index.screenid .. ":" .. focused_index.space .. ":" .. focused_index.col .. ":" .. focused_index.row)
-            print(window_list[focused_index.screenid].spaces[focused_index.space][focused_index.col][focused_index.row].win:title())
             new_focused_window = getWindow(focused_index.screenid, focused_index.space,
                 focused_index.col + direction, row)
             if new_focused_window then break end
         end
     elseif direction == Direction.UP and focused_index.row == 1 then
         PaperWM:goUpSpace()
-    elseif direction == Direction.DOWN and focused_index.row == #window_list[focused_index.screenid].spaces[focused_index.space][focused_index.col] then
+    elseif direction == Direction.DOWN and 
+           focused_index.row == #window_list[focused_index.screenid].spaces[focused_index.space][focused_index.col] then
         PaperWM:goDownSpace()
     elseif direction == Direction.UP or direction == Direction.DOWN then
         new_focused_window = getWindow(focused_index.screenid, focused_index.space, focused_index.col,
@@ -935,10 +932,22 @@ function PaperWM:swapWindows(direction)
             col = focused_index.col,
             row = focused_index.row + (direction // 2)
         }
+        if direction == Direction.UP and focused_index.row == 1 then
+            PaperWM:moveWindowUpSpace()
+        elseif direction == Direction.DOWN and 
+               focused_index.row == #window_list[focused_index.screenid].spaces[focused_index.space][focused_index.col] then
+            PaperWM:moveWindowDownSpace()
+        end
         local target_windowf = getWindowFrame(target_index.screenid, target_index.space, target_index.col,
             target_index.row)
         if not target_windowf then
             self.logger.d("target window not found")
+            return
+        end
+        local focused_windowf = getWindowFrame(focused_index.screenid, focused_index.space, focused_index.col,
+            focused_index.row)
+        if not focused_windowf then
+            self.logger.d("focused window not found")
             return
         end
 
@@ -1386,7 +1395,6 @@ end
 function PaperWM:moveWindow(window, frame)
     index = index_table[window:id()]
     
-    print(hs.inspect(index))
     window_list[index.screenid].spaces[index.space][index.col][index.row].frame = frame
     
     -- greater than 0.017 hs.window animation step time
@@ -1524,10 +1532,10 @@ PaperWM.actions = {
     focus_space_7 = partial(PaperWM.focusSpace, PaperWM, nil, 7),
     focus_space_8 = partial(PaperWM.focusSpace, PaperWM, nil, 8),
     focus_space_9 = partial(PaperWM.focusSpace, PaperWM, nil, 9),
-    swap_left = partial(PaperWM.swapWindows, PaperWM, Direction.LEFT),
-    swap_right = partial(PaperWM.swapWindows, PaperWM, Direction.RIGHT),
-    swap_up = partial(PaperWM.swapWindows, PaperWM, Direction.UP),
-    swap_down = partial(PaperWM.swapWindows, PaperWM, Direction.DOWN),
+    move_left = partial(PaperWM.swapWindows, PaperWM, Direction.LEFT),
+    move_right = partial(PaperWM.swapWindows, PaperWM, Direction.RIGHT),
+    move_up = partial(PaperWM.swapWindows, PaperWM, Direction.UP),
+    move_down = partial(PaperWM.swapWindows, PaperWM, Direction.DOWN),
     center_window = partial(PaperWM.centerWindow, PaperWM),
     full_width = partial(PaperWM.setWindowFullWidth, PaperWM),
     cycle_width = partial(PaperWM.cycleWindowSize, PaperWM, Direction.WIDTH, Direction.ASCENDING),
