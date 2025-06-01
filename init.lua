@@ -741,7 +741,7 @@ function PaperWM:addWindow(add_window, screenid, space)
         window_stay:focus()
     else 
         window_list[screenid].spaces[space].focusedwindow = add_window:id()
-        add_window:focus()
+        -- add_window:focus()
     end
     return space
 end
@@ -1433,38 +1433,57 @@ function PaperWM:chooseWindow()
     local windows = hs.window.visibleWindows()
     local chooserData = {}
 
-    for screenid, wl in ipairs(window_list) do
-        for _, tag in ipairs(wl.tags) do
-            local cols = wl.spaces[tag]
-            for _, col in ipairs(cols) do
-                for _, wf in ipairs(col) do
-                    local win = wf.win
-                    local app = win:application()
-                    local icon = hs.image.imageFromAppBundle(app:bundleID())
-                    table.insert(chooserData, {
-                        text = win:title(),
-                        -- subText = app:name(),
-                        subText = tag,
-                        image = icon,
-                        uuid = win:id()  -- We use the window ID to identify the selected window
-                    })
-                end
-            end
+    local chooser = hs.chooser.new(function(choice)
+        if not choice then return end
+        local window = hs.window.get(choice.uuid)
+        if window then
+            window:focus()
         end
-    end
+    end)
+
     local screenFrame = hs.screen.mainScreen():frame()
     local rowHeight = 55  
     local maxRows = math.floor(screenFrame.h / rowHeight)
 
-    local chooser = hs.chooser.new(function(choice)
-        if not choice then return end
-        local targetWin = hs.window.get(choice.uuid)
-        if targetWin then
-            targetWin:focus()
-        end
-    end):searchSubText(true):rows(maxRows)
+    chooser:searchSubText(false):rows(maxRows)
 
-    chooser:choices(chooserData)
+    local function buildChoices(query)
+        local q = (query or ""):lower()
+        local results = {}
+
+        for screenid, wl in ipairs(window_list) do
+            for _, tag in ipairs(wl.tags) do
+                local cols = wl.spaces[tag]
+                for _, col in ipairs(cols) do
+                    for _, wf in ipairs(col) do
+                        local win = wf.win
+                        local app = win:application()
+                        local icon = hs.image.imageFromAppBundle(app:bundleID())
+                        local title = win:title() or ""
+                        local appName = app and app:name() or ""
+
+                        if q == "" or title:lower():find(q, 1, true) or appName:lower():find(q, 1, true) or tag:lower():find(q, 1, true) then
+                            table.insert(results, {
+                                text = title,
+                                subText = tag,
+                                image = icon,
+                                uuid = win:id(),
+                            })
+                        end
+                    end
+                end
+            end
+        end
+        return results
+    end
+
+    chooser:choices(buildChoices(""))
+
+    chooser:queryChangedCallback(function(query)
+        chooser:choices(buildChoices(query))
+        chooser:refreshChoices()
+    end)
+
     chooser:show()
 end
 
