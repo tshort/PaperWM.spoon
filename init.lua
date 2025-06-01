@@ -234,7 +234,9 @@ end
 ---@param space Space
 ---@param col number
 ---@return Window[]
-local function getColumn(screenid, space, col) return (window_list[screenid].spaces[space] or {})[col] end
+local function getColumn(screenid, space, col) 
+    return (window_list[screenid].spaces[space] or {})[col] 
+end
 
 ---get a window in a row, in a column, in a space from the window_list
 ---@param screenid Screen
@@ -243,8 +245,8 @@ local function getColumn(screenid, space, col) return (window_list[screenid].spa
 ---@param row number
 ---@return Window
 local function getWindow(screenid, space, col, row)
-    local col = getColumn(screenid, space, col) 
-    if col then
+    local col = getColumn(screenid, space, col) or {}
+    if col[row] then
         return col[row].win
     else
         return nil
@@ -819,15 +821,20 @@ function PaperWM:focusWindow(direction, focused_index)
     if direction == Direction.LEFT or direction == Direction.RIGHT then
         -- walk down column, looking for match in neighbor column
         for row = focused_index.row, 1, -1 do
-            -- print(focused_index.screenid .. ":" .. focused_index.space .. ":" .. focused_index.col .. ":" .. focused_index.row)
-            -- print(window_list[focused_index.screenid].spaces[focused_index.space][focused_index.col][focused_index.row].win:title())
+            print(focused_index.screenid .. ":" .. focused_index.space .. ":" .. focused_index.col .. ":" .. focused_index.row)
+            print(window_list[focused_index.screenid].spaces[focused_index.space][focused_index.col][focused_index.row].win:title())
             new_focused_window = getWindow(focused_index.screenid, focused_index.space,
                 focused_index.col + direction, row)
             if new_focused_window then break end
         end
+    elseif direction == Direction.UP and focused_index.row == 1 then
+        PaperWM:goUpSpace()
+    elseif direction == Direction.DOWN and focused_index.row == #window_list[focused_index.screenid].spaces[focused_index.space][focused_index.col] then
+        PaperWM:goDownSpace()
     elseif direction == Direction.UP or direction == Direction.DOWN then
         new_focused_window = getWindow(focused_index.screenid, focused_index.space, focused_index.col,
             focused_index.row + (direction // 2))
+        
     end
 
     if not new_focused_window then
@@ -1127,7 +1134,7 @@ function PaperWM:slurpWindow()
     end
 
     -- append to end of column
-    table.insert(column, focused_window)
+    table.insert(column, {win = focused_window, frame = focused_window:frame()})
 
     -- update index table
     local num_windows = #column
@@ -1142,7 +1149,7 @@ function PaperWM:slurpWindow()
     -- adjust window frames
     local canvas = getCanvas(focused_window:screen())
     local bounds = {
-        x = column[1]:frame().x,
+        x = column[1].win:frame().x,
         x2 = nil,
         y = canvas.y,
         y2 = canvas.y2
@@ -1185,11 +1192,11 @@ function PaperWM:barfWindow()
 
     -- remove window and insert in new column
     table.remove(column, focused_index.row)
-    table.insert(window_list[focused_index.space], focused_index.col + 1,
-        { focused_window })
+    table.insert(window_list[focused_index.screenid].spaces[focused_index.space], focused_index.col + 1,
+        {{win = focused_window, frame = focused_window:frame()}})
 
     -- update index table
-    updateIndexTable(focused_index.space, focused_index.col)
+    updateIndexTable(focused_index.screenid, focused_index.space, focused_index.col)
 
     -- adjust window frames
     local num_windows = #column
@@ -1379,6 +1386,7 @@ end
 function PaperWM:moveWindow(window, frame)
     index = index_table[window:id()]
     
+    print(hs.inspect(index))
     window_list[index.screenid].spaces[index.space][index.col][index.row].frame = frame
     
     -- greater than 0.017 hs.window animation step time
@@ -1560,3 +1568,7 @@ return PaperWM
 -- DONE Move right windows to scratch
 -- DONE Switch to `util` not working key d
 -- DONE Close window and close app if it's the last one
+
+-- BUGS
+-- Coming out of sleep, it loses all windows
+
