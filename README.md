@@ -2,12 +2,12 @@
 
 # Fork
 
-The main purpose of this fork is to support virtual spaces like [Aerospace](https://github.com/nikitabobko/AeroSpace). Here are the main differences relative to the original.
+The main purpose of this fork is to support virtual spaces like [Aerospace](https://github.com/nikitabobko/AeroSpace). 
 
-All spaces are named. You can set up your own as follows:
+Spaces are arranged vertically. All spaces are named. You can set up your own as follows:
 
 ```lua
-PaperWM.tags = {"comms", "web", "util", "code", 1, 2, 3, 4, 5, 6, 7, 8, 9}
+PaperWM.space_names = {"comms", "web", "util", "code", 1, 2, 3, 4, 5, 6, 7, 8, 9}
 ```
 
 Every display has a dedicated space called `S1`, `S2`, ... The primary screen also has a scratch space `*`, mainly used for moving around windows.
@@ -20,31 +20,40 @@ Custom switching commands can be added as follows:
 PaperWM.actions["focus_space_comms"] = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, nil, "comms")
 ```
 
-You can define defaults for where apps open in spaces using the `defaultAppSpace` object. Each key is the application name, and the value is the name of the space. The `appsOpenInBackground` specifies apps where you want new windows to open in the "background" (right next to the original). The original window maintains focus. This is handy for browsers where you often want to open pages in the background. Here are examples of both.
+You can define defaults for where apps open in spaces using the `default_app_space` object. Each key is the application name, and the value is the name of the space. The `apps_open_in_background` specifies apps where you want new windows to open in the "background" (right next to the original). The original window maintains focus. This is handy for browsers where you often want to open pages in the background. Here are examples of both.
 
 ```lua
-PaperWM.defaultAppSpace = {
+PaperWM.default_app_space = {
     ["Microsoft Outlook"] = "comms", Slack = "comms", 
     Finder = "util", Ghostty = "util", Terminal = "util", 
     Firefox = "web", Safari = "web", ["Google Chrome"] = "web", qutebrowser = "web",
     Code = "code", 
 }
-PaperWM.appsOpenInBackground = {
+PaperWM.apps_open_in_background = {
     "Firefox", "Safari", "Google Chrome"
 }
 ```
 
 Here are new or changed commands:
 
-
-- `move_to_scratch_space`--Move the current window to the scratch space. The scratch space (labeled "*") is the last space on the primary screen. Typically bound to meta-Y (yank).
-- `move_from_scratch_space`--Move all windows from the scratch space to the current space. The scratch space makes it easy to move windows around. Yank multiple windows, switch to a new space then paste. Typically bound to meta-P (paste).
+- `move_to_scratch_space`--Move the current window to the scratch space. The scratch space (labeled "*") is the last space on the primary screen. Typically bound to `mod-Y` (yank, and `mod` is one or more modifiers like `alt` or `alt-cmd`).
+- `move_from_scratch_space`--Move all windows from the scratch space to the current space. The scratch space makes it easy to move windows around. Yank multiple windows, switch to a new space then paste. Typically bound to `mod-P` (paste).
 - `focus_scratch_space`--Switch to the scratch space.
 - `move_right_to_scratch_space`--Move the current window and all windows to the right to the scratch space. 
 - `focus_up`/`focus_down`--These now change focus up and down a space if at the top/bottom of a column.
 - `swap_*`--These were renamed to `move_*`. These now move windows up and down a space if at the top/bottom of a column. 
 - `close_window`--The same as cmd-W, except if it's the last window, it also closes the application.
 - `close_windows_in_space`--Close all windows in the space.
+- `choose_window`--This is a simple window selector that shows the available windows ordered by space. It's good enough to reduce the need for something like AltTab.
+
+Right now, there are several bugs:
+
+- Sometimes everything blitzes out, and spaces keep hanging, making everything flicker. Sometimes switching spaces helps. Going to sleep, and coming back out can stop it.
+- Coming out of sleep, it loses all windows.
+- Sometimes windows get stuck onscreen until that window's space gets retiled.
+
+It would also be nice to allow windows to be in multiple spaces, but that's a big code change and would require removing or changing `index_table`.
+
 
 # Original PaperWM readme
 

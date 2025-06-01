@@ -99,8 +99,8 @@ PaperWM.window_filter = WindowFilter.new():setOverrideFilter({
     allowRoles = "AXStandardWindow"
 })
 
--- default tags
-PaperWM.tags = {1, 2, 3, 4, 5, 6, 7, 8, 9}
+-- default space_names
+PaperWM.space_names = {1, 2, 3, 4, 5, 6, 7, 8, 9}
 
 PaperWM.appsOpenNextTo = {}
 
@@ -151,7 +151,8 @@ window_list = {} -- 3D array of tiles in order of [screenid].spaces[space][x][y]
                        
 index_table = {} -- dictionary of {screenid, space, x, y} with window id for keys
 local ui_watchers = {} -- dictionary of uielement watchers with window id for keys
-local is_floating = {} -- dictionary of boolean with window id for keys
+-- local is_floating = {} -- dictionary of boolean with window id for keys
+is_floating = {} -- dictionary of boolean with window id for keys
 menubar = hs.menubar.new(true, "spaceindicator")
 last_focused_app = "" -- stores the name of the last app with focus
 
@@ -173,7 +174,9 @@ local function updatemenu()
 end
 
 -- refresh window layout on screen change
-local screen_watcher = Screen.watcher.new(function() PaperWM:initWindows() end)
+local screen_watcher = Screen.watcher.new(function() 
+    PaperWM:tileAll() 
+end)
 
 -- https://stackoverflow.com/questions/640642/how-do-you-copy-a-lua-table-by-value
 function copy(obj, seen)
@@ -200,6 +203,7 @@ function PaperWM:stashWindow(windowframe)
 end        
 
 function PaperWM:hideWindow(window)
+    -- if not window then return end
     local idx = index_table[window:id()]
     local screenframe = window:screen():frame()
     local frame = window:frame()
@@ -295,10 +299,11 @@ local pending_window = nil ---@type Window|nil
 ---@param event string name of the event
 ---@param self PaperWM
 local function windowEventHandler(window, event, self)
-    if not window then
+    if not window or not window.id then
         return
     end
-    self.logger.df("%s for [%s] id: %d", event, window, window and window:id() or -1)
+    -- self.logger.df("%s for [%s] id: %d", event, window, window and window:id() or -1)
+    -- print(hs.inspect(window))
 
     --[[ When a new window is created, We first get a windowVisible event but
     without a Space. Next we receive a windowFocused event for the window, but
@@ -322,6 +327,9 @@ local function windowEventHandler(window, event, self)
     end
 
     if event == "windowFocused" then
+        if window:isFullScreen() then    -- NEEDED?
+            return
+        end
         if pending_window and window == pending_window then
             Timer.doAfter(Window.animationDuration,
                 function()
@@ -361,6 +369,9 @@ local function windowEventHandler(window, event, self)
             space = self:addWindow(window)
         end
     elseif event == "windowVisible" or event == "windowUnfullscreened" then
+        if window:isFullScreen() then    -- NEEDED?
+            return
+        end
         space = self:addWindow(window)
         if pending_window and window == pending_window then
             pending_window = nil -- tried to add window for the second time
@@ -376,6 +387,7 @@ local function windowEventHandler(window, event, self)
         space = self:removeWindow(window)
     elseif event == "windowFullscreened" then
         space = self:removeWindow(window, true) -- don't focus new window if fullscreened
+        return
     elseif event == "AXWindowMoved" or event == "AXWindowResized" then
         -- space = Spaces.windowSpaces(window)[1]
     elseif event == "windowDestroyed" and idx then
@@ -427,7 +439,8 @@ function PaperWM:focusSpace(screenid, space, window)
         window:focus()
     elseif window_list[screenid].spaces[space].focusedwindow and 
            #window_list[screenid].spaces[space] > 0 and 
-           hs.window.find(window_list[screenid].spaces[space].focusedwindow) then
+           hs.window.find(window_list[screenid].spaces[space].focusedwindow) and
+           hs.window.find(window_list[screenid].spaces[space].focusedwindow).focus then
         hs.window.find(window_list[screenid].spaces[space].focusedwindow):focus()
     else
         local w = getFirstVisibleWindow(window_list[screenid].spaces[space], hs.screen.find(screenid))
@@ -636,18 +649,18 @@ function PaperWM:initWindows()
     for k, screen in pairs(hs.screen.allScreens()) do
         local screenid = screen:id()
         window_list[screenid] = {}
-        window_list[screenid].tags = {"S" .. k}
+        window_list[screenid].space_names = {"S" .. k}
         window_list[screenid].spaces = {}
         if screenid == hs.screen.primaryScreen():id() then
             window_list.activescreenid = screenid
-            for _, space in ipairs(PaperWM.tags) do
-                table.insert(window_list[screenid].tags, space)
+            for _, space in ipairs(PaperWM.space_names) do
+                table.insert(window_list[screenid].space_names, space)
                 window_list[screenid].spaces[space] = {}
             end
-            table.insert(window_list[screenid].tags, "*")
+            table.insert(window_list[screenid].space_names, "*")
             window_list[screenid].spaces["*"] = {}
         end
-        window_list[screenid].activespace = window_list[screenid].tags[1]
+        window_list[screenid].activespace = window_list[screenid].space_names[1]
         for _, w in pairs(hs.window.filter.new(true):setScreens(screenid):getWindows()) do
             local space = self:addWindow(w)
         end
@@ -685,13 +698,13 @@ function PaperWM:addWindow(add_window, screenid, space)
     if index_table[add_window:id()] then return end
     local window_stay = nil
     if not screenid and not space then
-        local defaultspace = PaperWM.defaultAppSpace[add_window:application():title()]  
+        local defaultspace = PaperWM.default_app_space[add_window:application():title()]  
         local same_app = last_focused_app == add_window:application():title()
         if defaultspace and not same_app then    -- open next to the original
             screenid = PaperWM:findScreenIDWithSpace(defaultspace)
             space = defaultspace
         end
-        if same_app and indexOf(PaperWM.appsOpenInBackground, focused_window:application():title()) then
+        if same_app and focused_window and indexOf(PaperWM.apps_open_in_background, focused_window:application():title()) then
             window_stay = copy(focused_window)
         end
     end
@@ -1229,50 +1242,50 @@ end
 function PaperWM:incrementSpace(direction)
     local index = index_table[focused_window:id()]
     local space = window_list[index.screenid].activespace
-    local tags = window_list[index.screenid].tags
-    local tagidx = indexOf(tags, space)
+    local space_names = window_list[index.screenid].space_names
+    local tagidx = indexOf(space_names, space)
     if direction == Direction.UP and tagidx > 1 then
-        self:focusSpace(index.screenid, tags[tagidx - 1])
+        self:focusSpace(index.screenid, space_names[tagidx - 1])
     end
     if direction == Direction.DOWN and tagidx < #(window_list[index.screenid]) then
-        self:focusSpace(index.screenid, tags[tagidx + 1])
+        self:focusSpace(index.screenid, space_names[tagidx + 1])
     end
 end
 
 function PaperWM:goUpSpace()
     local index = index_table[focused_window:id()]
     local space = window_list[index.screenid].activespace
-    local tags = window_list[index.screenid].tags
-    local tagidx = indexOf(tags, space)
+    local space_names = window_list[index.screenid].space_names
+    local tagidx = indexOf(space_names, space)
     if tagidx > 1 then
-        self:focusSpace(index.screenid, tags[tagidx - 1])
+        self:focusSpace(index.screenid, space_names[tagidx - 1])
     end
 end
 function PaperWM:goDownSpace()
     local index = index_table[focused_window:id()]
     local space = window_list[index.screenid].activespace
-    local tags = window_list[index.screenid].tags
-    local tagidx = indexOf(tags, space)
-    if tagidx < #tags then
-        self:focusSpace(index.screenid, tags[tagidx + 1])
+    local space_names = window_list[index.screenid].space_names
+    local tagidx = indexOf(space_names, space)
+    if tagidx < #space_names then
+        self:focusSpace(index.screenid, space_names[tagidx + 1])
     end
 end
 function PaperWM:moveWindowUpSpace()
     local index = index_table[focused_window:id()]
     local space = window_list[index.screenid].activespace
-    local tags = window_list[index.screenid].tags
-    local tagidx = indexOf(tags, index.space)
+    local space_names = window_list[index.screenid].space_names
+    local tagidx = indexOf(space_names, index.space)
     if tagidx > 1 then
-        self:moveWindowToSpace(index.screenid, tags[tagidx - 1])
+        self:moveWindowToSpace(index.screenid, space_names[tagidx - 1])
     end
 end
 function PaperWM:moveWindowDownSpace()
     local index = index_table[focused_window:id()]
     local space = window_list[index.screenid].activespace
-    local tags = window_list[index.screenid].tags
-    local tagidx = indexOf(tags, index.space)
-    if tagidx < #tags then
-        self:moveWindowToSpace(index.screenid, tags[tagidx + 1])
+    local space_names = window_list[index.screenid].space_names
+    local tagidx = indexOf(space_names, index.space)
+    if tagidx < #space_names then
+        self:moveWindowToSpace(index.screenid, space_names[tagidx + 1])
     end
 end
 
@@ -1378,10 +1391,24 @@ function PaperWM:closeWindowsInSpace()
     end
 end
 
+function PaperWM:tileAll()
+    for _, screen in pairs(hs.screen.allScreens()) do
+        local screenid = screen:id()
+        for _, space in ipairs(window_list[screenid].space_names) do
+            PaperWM:tileSpace(screen, space)
+            for col, cols in ipairs(window_list[screenid].spaces[space]) do
+                for row, wf in ipairs(cols) do
+                    PaperWM:hideWindow(wf.win)
+                end
+            end
+        end
+    end
+end
+
 function PaperWM:findScreenIDWithSpace(space)
     -- Look for the display with the space
     for screenid, spaces in ipairs(window_list) do
-        if indexOf(spaces.tags, space) then   -- check for space in tags
+        if indexOf(spaces.space_names, space) then   -- check for space in space_names
             return screenid
         end
     end
@@ -1468,7 +1495,7 @@ function PaperWM:chooseWindow()
         local results = {}
 
         for screenid, wl in ipairs(window_list) do
-            for _, tag in ipairs(wl.tags) do
+            for _, tag in ipairs(wl.space_names) do
                 local cols = wl.spaces[tag]
                 for _, col in ipairs(cols) do
                     for _, wf in ipairs(col) do
@@ -1497,7 +1524,7 @@ function PaperWM:chooseWindow()
 
     chooser:queryChangedCallback(function(query)
         chooser:choices(buildChoices(query))
-        chooser:refreshChoices()
+        -- chooser:refreshChoices()
     end)
 
     chooser:show()
@@ -1558,25 +1585,4 @@ function PaperWM:bindHotkeys(mapping)
 end
 
 return PaperWM
-
-
--- TODO
-
--- DONE Fix left and right when at end
--- DONE Change focusedwindow for the space where a window was moved out of
--- DONE Fix alt-tab to another space
--- DONE Menubar
--- DONE Bug with windows stached on the right that are not fully off screen
--- Bug with a blocking gap between left and right windows - move jumps the gap
--- Allow windows to be in multiple spaces: need to remove or change index_table
--- DONE Add move_to_scratch function
--- DONE Add move_from_scratch function
--- Add functions to move spaces
--- DONE Close windows in space
--- DONE Move right windows to scratch
--- DONE Switch to `util` not working key d
--- DONE Close window and close app if it's the last one
-
--- BUGS
--- Coming out of sleep, it loses all windows
 
