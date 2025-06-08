@@ -7,7 +7,7 @@ The main purpose of this fork is to support virtual spaces like [Aerospace](http
 Spaces are arranged vertically. All spaces are named. You can set up your own as follows:
 
 ```lua
-PaperWM.space_names = {"comms", "web", "util", "code", 1, 2, 3, 4, 5, 6, 7, 8, 9}
+PaperWM.space_names = {0, "comms", "web", "util", "code", 1, 2, 3, 4, 5, 6, 7, 8, 9}
 ```
 
 The last space is a scratch space called `*`, mainly used for moving around windows.
@@ -73,11 +73,10 @@ Add something like the following to your `~/.hammerspoon/init.lua`. Edit as need
 PaperWM = hs.loadSpoon("PaperWM")
 local mods = {"alt"}
 local shiftmods = {"shift", "alt"}
-PaperWM.actions["focus_space_comms"] = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, nil, "comms")
-PaperWM.actions["focus_space_web"]   = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, nil, "web")
-PaperWM.actions["focus_space_util"]  = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, nil, "util")
-PaperWM.actions["focus_space_code"]  = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, nil, "code")
-PaperWM.actions["focus_space_s2"]  = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, nil, "S2")
+PaperWM.actions["focus_space_comms"] = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, "comms")
+PaperWM.actions["focus_space_web"]   = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, "web")
+PaperWM.actions["focus_space_util"]  = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, "util")
+PaperWM.actions["focus_space_code"]  = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, "code")
 PaperWM:bindHotkeys({
 
     -- switch windows 
