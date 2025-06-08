@@ -144,6 +144,11 @@ local Direction <const> = {
 -- hs.settings key for persisting is_floating, stored as an array of window id
 local IsFloatingKey <const> = 'PaperWM_is_floating'
 
+-- hs.settings key for persisting window column positions
+-- Stored as a dict with the key being an array of {space, app, window_name}
+local WindowColumnsKey <const> = 'PaperWM_window_columns'
+window_columns = hs.settings.get(WindowColumnsKey) or {}
+
 -- array of windows sorted from left to right
 window_list = {} -- 3D array of tiles in order of [screennum].spaces[space][x][y]
                        -- also stores 
@@ -161,7 +166,7 @@ menubar = hs.menubar.new(true, "spaceindicator")
 last_focused_app = "" -- stores the name of the last app with focus
 local animation_duration = 0
 
-local function updatemenu()
+local function updateMenu()
     local title = ""
     for i, screen in ipairs(hs.screen.allScreens()) do
         title = title .. window_list[i].activespace
@@ -177,6 +182,18 @@ local function updatemenu()
     end
     menubar:setTitle(title)
 end
+
+local function incrementWindowPositions(space, column)
+    -- update and store window column positions
+    local screennum = PaperWM:findScreenIDWithSpace(space)
+    for column, columns in ipairs(window_list[screennum].spaces[space]) do
+        for _, wf in ipairs(columns) do
+            window_columns[{space, wf.win:app():title(), wf.win:title()}] = column
+        end
+    end
+    hs.settings.set(WindowColumnsKey, window_columns)
+end
+
 
 -- refresh window layout on screen change
 local screen_watcher = Screen.watcher.new(function() 
@@ -357,7 +374,7 @@ local function windowEventHandler(window, event, self)
             end)
         if idx then
             -- hs.alert.show(idx.col)
-            updatemenu()
+            updateMenu()
             local prior_focusedwindow = window_list[idx.screennum].spaces[idx.space].focusedwindow
             if prior_focusedwindow and prior_focusedwindow ~= focused_window:id() then
                 window_list[idx.screennum].spaces[idx.space].focusedwindow = focused_window:id()
@@ -459,7 +476,7 @@ function PaperWM:focusSpace(screennum, space, window)
         end
     end
     -- PaperWM:tileSpace(hs.screen.find(screennum), space)
-    updatemenu()
+    updateMenu()
 end
 
 ---start automatic window tiling
@@ -481,6 +498,7 @@ function PaperWM:start()
     animation_duration = 0
     -- restore saved is_floating state, filtering for valid windows
     local persisted = hs.settings.get(IsFloatingKey) or {}
+    window_columns = hs.settings.get(WindowColumnsKey) or {}
     for _, id in ipairs(persisted) do
         local window = Window.get(id)
         if window and self.window_filter:isWindowAllowed(window) then
@@ -691,7 +709,7 @@ function PaperWM:initWindows()
     end 
     self:focusSpace(hs.screen.primaryScreen():id(), 0)
     focused_window = Window.focusedWindow()
-    updatemenu()
+    updateMenu()
 end
 
 ---add a new window to be tracked and automatically tiled
@@ -756,6 +774,8 @@ function PaperWM:addWindow(add_window, screennum, space)
     -- update index table
     updateIndexTable(screennum, space, add_column)
 
+    incrementWindowPositions(space, add_column)
+
     -- subscribe to window moved events
     local watcher = add_window:newWatcher(
         function(window, event, _, self)
@@ -799,6 +819,8 @@ function PaperWM:removeWindow(remove_window, skip_new_window_focus)
     if #window_list[remove_index.screennum].spaces[remove_index.space][remove_index.col] == 0 then
         table.remove(window_list[remove_index.screennum].spaces[remove_index.space], remove_index.col)
     end
+
+    incrementWindowPositions(remove_index.space, remove_index.col)
 
     -- remove watcher
     ui_watchers[remove_window:id()]:stop()
@@ -977,6 +999,8 @@ function PaperWM:swapWindows(direction)
             focused_windowf
         window_list[focused_index.screennum].spaces[focused_index.space][focused_index.col][focused_index.row] =
             target_windowf
+
+        incrementWindowPositions(target_index.space, math.min(target_index.col, focused_index.col))
 
         -- update index table
         index_table[target_windowf.win:id()] = focused_index
@@ -1158,6 +1182,8 @@ function PaperWM:slurpWindow()
     -- append to end of column
     table.insert(column, {win = focused_window, frame = focused_window:frame()})
 
+    incrementWindowPositions(focused_index.space, column)
+
     -- update index table
     local num_windows = #column
     index_table[focused_window:id()] = {
@@ -1217,6 +1243,8 @@ function PaperWM:barfWindow()
     table.insert(window_list[focused_index.screennum].spaces[focused_index.space], focused_index.col + 1,
         {{win = focused_window, frame = focused_window:frame()}})
 
+    incrementWindowPositions(focused_index.space, column)
+    
     -- update index table
     updateIndexTable(focused_index.screennum, focused_index.space, focused_index.col)
 
