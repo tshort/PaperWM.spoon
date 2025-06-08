@@ -661,8 +661,8 @@ function PaperWM:initWindows()
     for screennum, screen in pairs(hs.screen.allScreens()) do
         local screenid = screen:id()
         window_list[screennum] = {}
-        window_list[screennum].space_names = {"S" .. screennum}
         window_list[screennum].spaces = {}
+        window_list[screennum].space_names = {}
         window_list.screens[screennum] = screenid
         if screenid == hs.screen.primaryScreen():id() then
             window_list.activescreennum = screennum
@@ -689,7 +689,7 @@ function PaperWM:initWindows()
             end
         end 
     end 
-    self:focusSpace(hs.screen.primaryScreen():id(), "S1")
+    self:focusSpace(hs.screen.primaryScreen():id(), 0)
     focused_window = Window.focusedWindow()
     updatemenu()
 end
@@ -721,7 +721,7 @@ function PaperWM:addWindow(add_window, screennum, space)
             window_stay = copy(focused_window)
         end
     end
-    screennum = screennum or indexOf(add_window.screens, add_window:screen():id())
+    screennum = screennum or indexOf(window_list.screens, add_window:screen():id())
     space = space or window_list[screennum].activespace
     if not space then
         self.logger.e("add window does not have a space")
@@ -1421,7 +1421,7 @@ end
 function PaperWM:moveWindow(window, frame)
     index = index_table[window:id()]
     
-    window_list[index.screennunum.spaces[index.space][index.col][index.row].frame = frame
+    window_list[index.screennum].spaces[index.space][index.col][index.row].frame = frame
     
     -- greater than 0.017 hs.window animation step time
     local padding <const> = 0.02

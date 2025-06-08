@@ -10,7 +10,7 @@ Spaces are arranged vertically. All spaces are named. You can set up your own as
 PaperWM.space_names = {"comms", "web", "util", "code", 1, 2, 3, 4, 5, 6, 7, 8, 9}
 ```
 
-Every display has a dedicated space called `S1`, `S2`, ... The primary screen also has a scratch space `*`, mainly used for moving around windows.
+The last space is a scratch space called `*`, mainly used for moving around windows.
 
 Several commands are provided to switch spaces, including
 `focus_space_0`, `focus_space_1`, `focus_space_2`, `focus_space_3`, `focus_space_4`, `focus_space_5`, `focus_space_6`, `focus_space_7`, `focus_space_8`,  and`focus_space_9`.
