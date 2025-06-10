@@ -217,7 +217,7 @@ end
 ---@return nil
 function PaperWM:stashWindow(windowframe)
     local idx = index_table[windowframe.win:id()]
-    local screenframe = hs.screen.find(idx.screen_num):frame()
+    local screenframe = hs.screen.find(idx.screen_id):frame()
     local frame = windowframe.win:frame()
     local frame2 = copy(frame)      -- remember its position
     frame.x = screenframe.x2 - 1
@@ -298,7 +298,7 @@ local function updateIndexTable(space, column)
     local columns = window_list.spaces[space] or {}
     for col = column, #columns do
         for row, windowf in ipairs(getColumn(space, col)) do
-            index_table[windowf.win:id()] = { screen_num = window_list.spaces[space].screen_num, space = space, col = col, row = row }
+            index_table[windowf.win:id()] = { screen_id = window_list.spaces[space].screen_id, space = space, col = col, row = row }
         end
     end
 end
@@ -381,7 +381,7 @@ local function windowEventHandler(window, event, self)
             end
             space = idx.space     -- forces retiling
             if idx_prior then
-                if idx_prior.screen_num ~= idx.screen_num or
+                if idx_prior.screen_id ~= idx.screen_id or
                    idx_prior.space ~= idx.space then
                     self:focusSpace(idx.space, window)
                 end
@@ -692,7 +692,7 @@ function PaperWM:initWindows()
         window_list.spaces[space].screen_num = 1   -- TODO: fix this
         window_list.spaces[space].screen_id = 1
     end 
-    for _, w in pairs(hs.window.filter.new(true):getWindows()) do
+    for _, w in pairs(self.window_filter:getWindows()) do
         local space = self:addWindow(w)
     end
     for _, space in ipairs(window_list.space_names) do
@@ -725,13 +725,15 @@ function PaperWM:addWindow(add_window, space)
     --     return
     -- end
     -- check if window is already in window list
-    if index_table[add_window:id()] then return end
+    if index_table[add_window:id()] or 
+       add_window:frame().w < 1 then
+        return
+    end
     local window_stay = nil
     if not space then
         local default_space = PaperWM.default_app_space[add_window:application():title()]  
         local same_app = last_focused_app == add_window:application():title()
         if default_space and not same_app then    -- open next to the original
-            print(default_space)
             screen_num = window_list.spaces[default_space].screen_num
             space = default_space
         end
@@ -851,7 +853,7 @@ function PaperWM:focusWindow(direction, focused_index)
     end
 
     if not focused_index then
-        self.logger.e("focused index not found")
+        self.logger.e("focusWindow: focused index not found")
         return
     end
 
@@ -876,7 +878,7 @@ function PaperWM:focusWindow(direction, focused_index)
     end
 
     if not new_focused_window then
-        -- self.logger.d("new focused window not found")
+        self.logger.d("new focused window not found")
         return
     end
 
@@ -927,6 +929,7 @@ function PaperWM:swapWindows(direction)
         -- update index table
         for row, windowf in ipairs(target_column) do
             index_table[windowf.win:id()] = {
+                screen_id = focused_index.screen_id,
                 space = focused_index.space,
                 col = focused_index.col,
                 row = row
@@ -934,6 +937,7 @@ function PaperWM:swapWindows(direction)
         end
         for row, windowf in ipairs(focused_column) do
             index_table[windowf.win:id()] = {
+                screen_id = focused_index.screen_id,
                 space = focused_index.space,
                 col = target_index.col,
                 row = row
@@ -1013,7 +1017,7 @@ function PaperWM:swapWindows(direction)
     end
 
     -- update layout
-    self:tileSpace(target_windowf.win:screen(), focused_index.space)
+    self:tileSpace(focused_index.space)
 end
 
 ---move the focused window to the center of the screen, horizontally
@@ -1037,7 +1041,7 @@ function PaperWM:centerWindow()
 
     -- update layout
     local space = Spaces.windowSpaces(focused_window)[1]
-    self:tileSpace(window:screen(), space)
+    self:tileSpace(space)
 end
 
 ---set the focused window to the width of the screen
@@ -1058,7 +1062,7 @@ function PaperWM:setWindowFullWidth()
     self:moveWindow(focused_window, focused_frame)
 
     -- update layout
-    self:tileSpace(focused_window:screen(), index_table[focused_window:id()].space)
+    self:tileSpace(index_table[focused_window:id()].space)
 end
 
 ---resize the width or height of the window, keeping the other dimension the
@@ -1132,7 +1136,7 @@ function PaperWM:cycleWindowSize(direction, cycle_direction)
     self:moveWindow(focused_window, focused_frame)
 
     -- update layout
-    self:tileSpace(focused_window:screen(), index_table[focused_window:id()].space)
+    self:tileSpace(index_table[focused_window:id()].space)
 end
 
 ---take the current focused window and move it into the bottom of
@@ -1179,6 +1183,7 @@ function PaperWM:slurpWindow()
     -- update index table
     local num_windows = #column
     index_table[focused_window:id()] = {
+        screen_id = focused_index.screen_id,
         space = focused_index.space,
         col = focused_index.col - 1,
         row = num_windows
@@ -1198,7 +1203,7 @@ function PaperWM:slurpWindow()
     self:tileColumn(column, bounds, h)
 
     -- update layout
-    self:tileSpace(focused_window:screen(), focused_index.space)
+    self:tileSpace(focused_index.space)
 end
 
 ---remove focused window from it's current column and place into
@@ -1253,7 +1258,7 @@ function PaperWM:barfWindow()
     self:tileColumn(column, bounds, h)
 
     -- update layout
-    self:tileSpace(focused_window:screen(), focused_index.space)
+    self:tileSpace(focused_index.space)
 end
 
 ---switch to a Mission Control space to the left or right of current space
@@ -1347,12 +1352,12 @@ function PaperWM:moveWindowToSpace(space, window, stay)
 end
 
 function PaperWM:moveWindowToScratchSpace()
-    PaperWM:moveWindowToSpace(hs.screen.primaryScreen():id(), "*", focused_window, true)
+    PaperWM:moveWindowToSpace("*", focused_window, true)
 end
 
 function PaperWM:moveWindowsFromScratchSpace()
     local space = window_list.activespace
-    for i, cols in ipairs(copy(window_list[hs.screen.primaryScreen():id()].spaces["*"])) do
+    for i, cols in ipairs(copy(window_list.spaces["*"])) do
         for _, wf in ipairs(cols) do
             PaperWM:moveWindowToSpace(space, wf.win)
         end
@@ -1369,14 +1374,14 @@ function PaperWM:moveWindowsRightToScratchSpace()
     for col, cols in ipairs(copy(window_list.spaces[space])) do
         for row, wf in ipairs(cols) do
             if col >= focused_col then
-                PaperWM:moveWindowToSpace(hs.screen.primaryScreen():id(), "*", wf.win, true)
+                PaperWM:moveWindowToSpace("*", wf.win, true)
             end
         end
     end
 end
 
 function PaperWM:focusScratchSpace()
-    PaperWM:focusSpace(hs.screen.primaryScreen():id(), "*")
+    PaperWM:focusSpace("*")
 end
 
 
@@ -1480,7 +1485,7 @@ function PaperWM:toggleFloating()
         space = self:addWindow(window)
     end
     if space then
-        self:tileSpace(window:screen(), space)
+        self:tileSpace(space)
     end
 end
 
@@ -1490,7 +1495,7 @@ function PaperWM:chooseWindow()
 
     local chooser = hs.chooser.new(function(choice)
         if not choice then return end
-        local windows = hs.window.filter.new():getWindows()
+        local windows = self.window_filter.new():getWindows()
         for _, w in ipairs(windows) do
             if w:id() == choice.uuid then
                 w:focus()
@@ -1534,7 +1539,7 @@ function PaperWM:chooseWindow()
                 end
             end
         end
-        for _, win in ipairs(hs.window.filter.new():setOverrideFilter{fullscreen=true}:getWindows()) do
+        for _, win in ipairs(self.window_filter.new():setOverrideFilter{fullscreen=true}:getWindows()) do
             local app = win:application()
             local icon = hs.image.imageFromAppBundle(app:bundleID())
             local title = win:title() or ""
