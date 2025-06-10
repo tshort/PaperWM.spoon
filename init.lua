@@ -250,7 +250,9 @@ local function getFirstVisibleWindow(columns, screen)
     local x = screen:frame().x
     for _, windows in ipairs(columns or {}) do
         local window = windows[1].win -- take first window in column
-        if window:frame().x >= x then return window end
+        if window:frame().x >= x then 
+            return window 
+        end
     end
 end
 
@@ -433,8 +435,8 @@ end
 ---make the specified space the active space
 ---@param space Space
 ---@param window Window|nil a window in the space
-function PaperWM:focusSpace(space, window)
-    if window_list.activespace == space then
+function PaperWM:focusSpace(space, window, force)
+    if window_list.activespace == space and not force then
         return
     end
     if window_list.spaces[window_list.activespace] then
@@ -706,7 +708,7 @@ function PaperWM:initWindows()
             end
         end
     end 
-    self:focusSpace(window_list.space_names[1])
+    self:focusSpace(window_list.space_names[1], nil, true)
     focused_window = Window.focusedWindow()
     updateMenu()
 end
