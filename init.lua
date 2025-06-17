@@ -10,7 +10,7 @@
 --- Set `PaperWM.window_gap` to the number of pixels to space between windows and
 --- the top and bottom screen edges.
 ---
---- Overwrite `PaperWM.window_filter` to ignore specific applications. For example:
+--- Overwrite `PaperWM.\r` to ignore specific applications. For example:
 ---
 --- ```
 --- PaperWM.window_filter = PaperWM.window_filter:setAppFilter("Finder", false)
@@ -1497,7 +1497,8 @@ function PaperWM:chooseWindow()
 
     local chooser = hs.chooser.new(function(choice)
         if not choice then return end
-        local windows = self.window_filter.new():getWindows()
+        local windows = self.window_filter:getWindows()
+        print(hs.inspect(windows))
         for _, w in ipairs(windows) do
             if w:id() == choice.uuid then
                 w:focus()
@@ -1541,7 +1542,7 @@ function PaperWM:chooseWindow()
                 end
             end
         end
-        for _, win in ipairs(self.window_filter.new():setOverrideFilter{fullscreen=true}:getWindows()) do
+        for _, win in ipairs(copy(self.window_filter):setOverrideFilter{fullscreen=true}:getWindows()) do
             local app = win:application()
             local icon = hs.image.imageFromAppBundle(app:bundleID())
             local title = win:title() or ""
