@@ -170,19 +170,17 @@ local animation_duration = 0
 
 local function updateMenu()
     local title = ""
-    title = title .. window_list.activespace
-    -- for i, screen in ipairs(hs.screen.allScreens()) do
-    --     title = title .. window_list[i].activespace
-    --     if screen == hs.screen.mainScreen() then
-    --         local idt = index_table[hs.window.focusedWindow():id()]
-    --         if idt.space == window_list.activespace then
-    --             title = title .. "-" .. idt.col
-    --         end
-    --     end
-    --     if i < #hs.screen.allScreens() then
-    --         title = title .. ":"
-    --     end
-    -- end
+    local screens = hs.screen.allScreens()
+    if #screens == 1 then 
+        title = window_list.activespace
+    else
+        for i, screen in ipairs(screens) do
+            title = title .. (window_list.screen_activespace[window_list.screen_ids[i]] or "-")
+            if i < #screens then
+                title = title .. ":"
+            end
+        end
+    end
     menubar:setTitle(title)
 end
 
@@ -200,7 +198,7 @@ end
 
 -- refresh window layout on screen change
 local screen_watcher = Screen.watcher.new(function() 
-    self:tileAll() 
+    PaperWM:tileAll() 
 end)
 
 -- https://stackoverflow.com/questions/640642/how-do-you-copy-a-lua-table-by-value
@@ -1448,6 +1446,9 @@ function PaperWM:moveActiveSpaceToNextScreen()
                 self:tileSpace(space)
                 break
             end
+        end
+        if window_list.screen_activespace[screen_id] == window_list.activespace then    -- no space was found
+            window_list.screen_activespace[screen_id] = nil
         end
         local sk = hs.settings.get(ScreensKey) or {}
         if next_id == hs.screen.primaryScreen():id() then 
