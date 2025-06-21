@@ -40,7 +40,7 @@ When windows are opened, PaperWM attempts to remember the last space and window 
 
 Here are new or changed commands:
 
-- `move_to_scratch_space`--Move the current window to the scratch space. The scratch space (labeled "*") is the last space on the primary screen. Typically bound to `mod-Y` (yank, and `mod` is one or more modifiers like `alt` or `alt-cmd`).
+- `move_to_scratch_space`--Move the current window to the scratch space. The scratch space (labeled "*") is the last space. Typically bound to `mod-Y` (yank, and `mod` is one or more modifiers like `alt` or `alt-cmd`).
 - `move_from_scratch_space`--Move all windows from the scratch space to the current space. The scratch space makes it easy to move windows around. Yank multiple windows, switch to a new space then paste. Typically bound to `mod-P` (paste).
 - `focus_scratch_space`--Switch to the scratch space.
 - `move_right_to_scratch_space`--Move the current window and all windows to the right to the scratch space. 

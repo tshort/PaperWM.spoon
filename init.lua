@@ -64,6 +64,7 @@ PaperWM.license = "MIT - https://opensource.org/licenses/MIT"
 ---@alias PaperWM table PaperWM module object
 ---@alias Window userdata a ui.window
 ---@alias Frame table hs.geometry rect
+---@alias WindowFrame { win: Window, frame: Frame }
 ---@alias Index { row: number, col: number, space: number, screen_id: number }
 ---@alias Space number a Mission Control space ID
 ---@alias Screen userdata hs.screen
@@ -149,23 +150,28 @@ local IsFloatingKey <const> = 'PaperWM_is_floating'
 
 -- hs.settings key for persisting window column positions
 -- Stored as a dict with the key being an array of {space, app, window_name}
-window_columns = hs.settings.get("PaperWM_window_columns") or {}
+local window_columns = hs.settings.get("PaperWM_window_columns") or {}
 
 -- array of windows sorted from left to right
-window_list = {} -- 2D array of tiles by space in order of .spaces[space][x][y]
+local window_list = {} -- 2D array of tiles by space in order of .spaces[space][x][y]
                        -- also stores 
                        --   .active_space
+                       --   .screen_active_space[]
+                       --   .screen_ids[]
+                       --   .space_names[]
                        --   .spaces[space].focused_window
+                       --   .spaces[space].screen_id
+                       --   .spaces[space].screen_num
                        --   .spaces[space][x][y].win
                        --   .spaces[space][x][y].frame
                        
-index_table = {} -- dictionary of {screen_num, space, x, y} with window id for keys
+local index_table = {} -- dictionary of {screen_num, space, x, y} with window id for keys
 -- local ui_watchers = {} -- dictionary of uielement watchers with window id for keys
-ui_watchers = {} -- dictionary of uielement watchers with window id for keys
+local ui_watchers = {} -- dictionary of uielement watchers with window id for keys
 -- local is_floating = {} -- dictionary of boolean with window id for keys
-is_floating = {} -- dictionary of boolean with window id for keys
-menubar = hs.menubar.new(true, "spaceindicator")
-last_focused_app = "" -- stores the name of the last app with focus
+local is_floating = {} -- dictionary of boolean with window id for keys
+local menubar = hs.menubar.new(true, "spaceindicator")
+local last_focused_app = "" -- stores the name of the last app with focus
 local animation_duration = 0
 
 local function updateMenu()
@@ -214,16 +220,16 @@ function copy(obj, seen)
 end
 
 ---move a window offscreen, and retain its position
----@param windowframe WindowFrame to stash
+---@param window_frame WindowFrame to stash
 ---@return nil
-function PaperWM:stashWindow(windowframe)
-    local idx = index_table[windowframe.win:id()]
+function PaperWM:stashWindow(window_frame)
+    local idx = index_table[window_frame.win:id()]
     local screenframe = Screen.find(idx.screen_id):frame()
-    local frame = windowframe.win:frame()
+    local frame = window_frame.win:frame()
     local frame2 = copy(frame)      -- remember its position
     frame.x = screenframe.x2 - 1
-    self:moveWindow(windowframe.win, frame)
-    windowframe.frame = frame2
+    self:moveWindow(window_frame.win, frame)
+    window_frame.frame = frame2
 end        
 
 ---move a window offscreen
@@ -239,15 +245,15 @@ function PaperWM:hideWindow(window)
 end        
 
 ---restore a window
----@param windowframe WindowFrame to move
+---@param window_frame WindowFrame to move
 ---@return nil
-function PaperWM:restoreWindow(windowframe)
-    self:moveWindow(windowframe.win, windowframe.frame)
+function PaperWM:restoreWindow(window_frame)
+    self:moveWindow(window_frame.win, window_frame.frame)
 end
 
 
 ---return the leftmost window that's completely on the screen
----@param columns WindowFrame[] a column of windowframes
+---@param columns WindowFrame[] a column of window_frames
 ---@param screen Frame the coordinates of the screen
 ---@return Window|nil
 local function getFirstVisibleWindow(columns, screen)
@@ -282,7 +288,7 @@ local function getWindow(space, col, row)
     end
 end
 
----get a windowframe in a row, in a column, in a space from the window_list
+---get a window_frame in a row, in a column, in a space from the window_list
 ---@param space Space
 ---@param col number
 ---@param row number
@@ -893,6 +899,27 @@ function PaperWM:removeWindow(remove_window, skip_new_window_focus)
     return remove_index.space -- return space for removed window
 end
 
+local function nextSpace(direction)
+    local space = window_list.active_space
+    local space_names = window_list.space_names
+    local tagidx = indexOf(space_names, space)
+    local screen_id = window_list.spaces[space].screen_id
+    if direction == Direction.UP then
+        for idx = tagidx - 1, 1, -1 do
+            if screen_id == window_list.spaces[space_names[idx]].screen_id then
+                return space_names[idx]
+            end
+        end
+    elseif direction == Direction.DOWN then
+        for idx = tagidx + 1, #space_names do
+            if screen_id == window_list.spaces[space_names[idx]].screen_id then
+                return space_names[idx]
+            end
+        end
+    end
+    return nil
+end
+
 ---move focus to a new window next to the currently focused window
 ---@param direction Direction use either Direction UP, DOWN, LEFT, or RIGHT
 ---@param focused_index Index index of focused window within the window_list
@@ -924,15 +951,12 @@ function PaperWM:focusWindow(direction, focused_index)
                 focused_index.col + direction, row)
             if new_focused_window then break end
         end
-    elseif direction == Direction.UP and focused_index.row == 1 then
-        self:goUpSpace()
-    elseif direction == Direction.DOWN and 
-           focused_index.row == #window_list.spaces[focused_index.space][focused_index.col] then
-        self:goDownSpace()
+    elseif (direction == Direction.UP and focused_index.row == 1) or
+           (direction == Direction.DOWN and focused_index.row == #window_list.spaces[focused_index.space][focused_index.col]) then
+        self:focusSpace(nextSpace(direction))
     elseif direction == Direction.UP or direction == Direction.DOWN then
         new_focused_window = getWindow(focused_index.space, focused_index.col,
             focused_index.row + (direction // 2))
-        
     end
 
     if not new_focused_window then
@@ -1029,11 +1053,10 @@ function PaperWM:swapWindows(direction)
             col = focused_index.col,
             row = focused_index.row + (direction // 2)
         }
-        if direction == Direction.UP and focused_index.row == 1 then
-            self:moveWindowUpSpace()
-        elseif direction == Direction.DOWN and 
-               focused_index.row == #window_list.spaces[focused_index.space][focused_index.col] then
-            self:moveWindowDownSpace()
+        if (direction == Direction.UP and focused_index.row == 1) or
+           (direction == Direction.DOWN and 
+            focused_index.row == #window_list.spaces[focused_index.space][focused_index.col]) then
+            self:moveWindowToSpace(nextSpace(direction))
         end
         local target_windowf = getWindowFrame(target_index.space, target_index.col,
             target_index.row)
@@ -1329,64 +1352,16 @@ function PaperWM:barfWindow()
     self:tileSpace(focused_index.space)
 end
 
----switch to a Mission Control space to the left or right of current space
+---switch to a space up or down relative to the current space
 ---@param direction Direction use Direction.UP or Direction.DOWN
-function PaperWM:incrementSpace(direction)
-    local index = index_table[focused_window:id()]
-    local space = window_list.active_space
-    local space_names = window_list.space_names
-    local tagidx = indexOf(space_names, space)
-    if direction == Direction.UP and tagidx > 1 then
-        self:focusSpace(space_names[tagidx - 1])
-    end
-    if direction == Direction.DOWN and tagidx < #(window_list) then
-        self:focusSpace(space_names[tagidx + 1])
-    end
+function PaperWM:focusNextSpace(direction)
+    self:focusSpace(nextSpace(direction))
 end
 
-function PaperWM:goUpSpace()
-    local index = index_table[focused_window:id()]
-    local space = window_list.active_space
-    local space_names = window_list.space_names
-    local tagidx = indexOf(space_names, space)
-    local screen_id = window_list.spaces[space].screen_id
-    for idx = tagidx - 1, 1, -1 do
-        if screen_id == window_list.spaces[space_names[idx]].screen_id then
-            self:focusSpace(space_names[idx])
-            return
-        end
-    end
-end
-function PaperWM:goDownSpace()
-    local index = index_table[focused_window:id()]
-    local space = window_list.active_space
-    local space_names = window_list.space_names
-    local tagidx = indexOf(space_names, space)
-    local screen_id = window_list.spaces[space].screen_id
-    for idx = tagidx + 1, #space_names do
-        if screen_id == window_list.spaces[space_names[idx]].screen_id then
-            self:focusSpace(space_names[idx])
-            return
-        end
-    end
-end
-function PaperWM:moveWindowUpSpace()
-    local index = index_table[focused_window:id()]
-    local space = window_list.active_space
-    local space_names = window_list.space_names
-    local tagidx = indexOf(space_names, index.space)
-    if tagidx > 1 then
-        self:moveWindowToSpace(space_names[tagidx - 1])
-    end
-end
-function PaperWM:moveWindowDownSpace()
-    local index = index_table[focused_window:id()]
-    local space = window_list.active_space
-    local space_names = window_list.space_names
-    local tagidx = indexOf(space_names, index.space)
-    if tagidx < #space_names then
-        self:moveWindowToSpace(space_names[tagidx + 1])
-    end
+---move active window to a space up or down relative to the current space
+---@param direction Direction use Direction.UP or Direction.DOWN
+function PaperWM:moveWindowToNextSpace(direction)
+        self:moveWindowToSpace(nextSpace(direction))
 end
 
 ---move focused window to a Mission Control space
@@ -1701,10 +1676,10 @@ PaperWM.actions = {
     focus_right = partial(PaperWM.focusWindow, PaperWM, Direction.RIGHT),
     focus_up = partial(PaperWM.focusWindow, PaperWM, Direction.UP),
     focus_down = partial(PaperWM.focusWindow, PaperWM, Direction.DOWN),
-    up_space = partial(PaperWM.goUpSpace, PaperWM),
-    down_space = partial(PaperWM.goDownSpace, PaperWM),
-    move_up_space = partial(PaperWM.moveWindowUpSpace, PaperWM),
-    move_down_space = partial(PaperWM.moveWindowDownSpace, PaperWM),
+    -- up_space = partial(PaperWM.goUpSpace, PaperWM),
+    -- down_space = partial(PaperWM.goDownSpace, PaperWM),
+    -- move_up_space = partial(PaperWM.moveWindowUpSpace, PaperWM),
+    -- move_down_space = partial(PaperWM.moveWindowDownSpace, PaperWM),
     space_to_next_screen = partial(PaperWM.moveActiveSpaceToNextScreen, PaperWM),
     next_screen = partial(PaperWM.focusNextScreen, PaperWM),
     close_window = partial(PaperWM.closeWindow, PaperWM),
@@ -1732,8 +1707,6 @@ PaperWM.actions = {
     slurp_in = partial(PaperWM.slurpWindow, PaperWM),
     barf_out = partial(PaperWM.barfWindow, PaperWM),
     choose_window = partial(PaperWM.chooseWindow, PaperWM),
-    -- switch_space_u = partial(PaperWM.incrementSpace, PaperWM, Direction.UP),
-    -- switch_space_d = partial(PaperWM.incrementSpace, PaperWM, Direction.DOWN),
 }
 
 ---bind userdefined hotkeys to PaperWM actions
