@@ -2,7 +2,7 @@
 
 ## Fork
 
-The main purpose of this fork is to support virtual spaces like [Aerospace](https://github.com/nikitabobko/AeroSpace). 
+The main purpose of this fork is to support virtual spaces like [Aerospace](https://github.com/nikitabobko/AeroSpace). The active spaces for each screen are shown in the menubar.
 
 Spaces are arranged vertically. All spaces are named. You can set up your own as follows:
 
@@ -13,7 +13,7 @@ PaperWM.space_names = {0, "comms", "web", "util", "code", 1, 2, 3, 4, 5, 6, 7, 8
 The last space is a scratch space called `*`, mainly used for moving around windows.
 
 Several commands are provided to switch spaces, including
-`focus_space_0`, `focus_space_1`, `focus_space_2`, `focus_space_3`, `focus_space_4`, `focus_space_5`, `focus_space_6`, `focus_space_7`, `focus_space_8`,  and`focus_space_9`.
+`focus_space_0`, `focus_space_1`, `focus_space_2`, `focus_space_3`, `focus_space_4`, `focus_space_5`, `focus_space_6`, `focus_space_7`, `focus_space_8`, and `focus_space_9`.
 Custom switching commands can be added as follows:
 
 ```lua
@@ -34,6 +34,10 @@ PaperWM.apps_open_in_background = {
 }
 ```
 
+By default, spaces are assigned to the primary screen. Spaces can be moved to other screens. PaperWM attempts to remember which screen a space was last assigned to.
+
+When windows are opened, PaperWM attempts to remember the last space and window ordering. This is based on the application and window title. This isn't perfect. When VS Code opens windows, the windows initially have no title, so the remembered ordering doesn't work. 
+
 Here are new or changed commands:
 
 - `move_to_scratch_space`--Move the current window to the scratch space. The scratch space (labeled "*") is the last space on the primary screen. Typically bound to `mod-Y` (yank, and `mod` is one or more modifiers like `alt` or `alt-cmd`).
@@ -45,12 +49,14 @@ Here are new or changed commands:
 - `close_window`--The same as cmd-W, except if it's the last window, it also closes the application.
 - `close_windows_in_space`--Close all windows in the space.
 - `choose_window`--This is a simple window selector that shows the available windows ordered by space. It's good enough to reduce the need for something like AltTab.
+- `next_screen`--Focus the next screen (note that the next screen needs a space in which to focus).
+- `space_to_next_screen`--Move the active space to the next screen.
 
-Right now, there are several bugs:
+There are still bugs:
 
-- Sometimes everything blitzes out, and spaces keep hanging, making everything flicker. Sometimes switching spaces helps. Going to sleep, and coming back out can stop it.
-- Sometimes windows get stuck onscreen until that window's space gets retiled.
-- When yanking windows, sometimes the focus goes to a hidden window.
+- Sometimes everything blitzes out, and spaces keep switching, making everything flicker. Sometimes switching spaces helps. Locking and coming back out can stop it.
+- Sometimes, cycling window widths doesn't work right.
+- After returning from full screen, the window doesn't show the right space.
 
 It would also be nice to allow windows to be in multiple spaces, but that's a big code change and would require removing or changing `index_table`.
 
@@ -62,132 +68,16 @@ Many of the original [PaperWM.spoon](https://github.com/mogenson/PaperWM.spoon) 
 
 1. Clone to Hammerspoon Spoons directory: `git clone https://github.com/tshort/PaperWM.spoon ~/.hammerspoon/Spoons/PaperWM.spoon`.
 
-2. Open `System Preferences` -> `Mission Control`. Uncheck "Displays have separate
-Spaces".
+2. Open `System Preferences` -> `Mission Control`. Uncheck "Displays have separate Spaces".
 
 ## Usage
 
-Add something like the following to your `~/.hammerspoon/init.lua`. Edit as needed based on preferences for keyboard shortcuts and use of spaces.
+Add configuration information to your `~/.hammerspoon/init.lua`. Here is an example configuration:
 
-```lua
-PaperWM = hs.loadSpoon("PaperWM")
-local mods = {"alt"}
-local shiftmods = {"shift", "alt"}
-PaperWM.actions["focus_space_comms"] = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, "comms")
-PaperWM.actions["focus_space_web"]   = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, "web")
-PaperWM.actions["focus_space_util"]  = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, "util")
-PaperWM.actions["focus_space_code"]  = hs.fnutils.partial(PaperWM.focusSpace, PaperWM, "code")
-PaperWM:bindHotkeys({
+* [init.lua](./example-init.lua)
+* [menuHammerCustomConfig.lua](./menuHammerCustomConfig.lua)
 
-    -- switch windows 
-    focus_left  = {mods, "left"},
-    focus_right = {mods, "right"},
-    focus_up    = {mods, "up"},
-    focus_down  = {mods, "down"},
-
-    -- scratch space
-    move_to_scratch_space = {mods, "y"},
-    move_right_to_scratch_space = {shiftmods, "y"}, 
-    move_from_scratch_space = {mods, "p"},
-    focus_scratch_space = {mods, "e"},
-
-    -- move windows around
-    move_left  = {shiftmods, "left"},
-    move_right = {shiftmods, "right"},
-    move_up    = {shiftmods, "up"},
-    move_down  = {shiftmods, "down"},
-
-    -- alternative: swap entire columns, rather than
-    -- individual windows (to be used instead of
-    -- swap_left / swap_right bindings)
-    -- swap_column_left = {shiftmods, "left"},
-    -- swap_column_right = {shiftmods, "right"},
-
-    -- position and resize focused window
-    refresh_windows      = {mods, "r"},
-    cycle_width          = {mods, "c"},
-    full_width           = {shiftmods, "c"},
-    -- reverse_cycle_width  = {{"ctrl", "alt"}, "r"},
-    -- cycle_height         = {shiftmods, "r"},
-    -- reverse_cycle_height = {{"ctrl", "alt", "shift"}, "r"},
-
-    -- increase/decrease width
-    -- increase_width = {{"ctrl", "alt", "shift"}, "l"},
-    -- decrease_width = {{"ctrl", "alt", "shift"}, "h"},
-
-    -- move focused window into / out of a column
-    slurp_in = {mods, "i"},
-    barf_out = {mods, "o"},
-
-    -- move the focused window into / out of the tiling layer
-    toggle_floating = {shiftmods, "escape"},
-
-    -- switch to a new Mission Control space
-    focus_space_comms = {mods, "a"},
-    focus_space_web   = {mods, "s"},
-    focus_space_util  = {mods, "d"},
-    focus_space_code  = {mods, "f"},
-    focus_space_0 = {mods, "0"},
-    focus_space_1 = {mods, "1"},
-    focus_space_2 = {mods, "2"},
-    focus_space_3 = {mods, "3"},
-    focus_space_4 = {mods, "4"},
-    focus_space_5 = {mods, "5"},
-    focus_space_6 = {mods, "6"},
-    focus_space_7 = {mods, "7"},
-    focus_space_8 = {mods, "8"},
-    focus_space_9 = {mods, "9"},
-    focus_space_s2 = {mods, "-"},
-    -- closing windows
-    close_window = {mods, "w"},
-    close_windows_in_space = {shiftmods, "w"},
-    -- window chooser
-    choose_window = {mods, "z"},
-})
-
-hs.hotkey.bind(mods, "h", PaperWM.actions.focus_left)
-hs.hotkey.bind(mods, "j", PaperWM.actions.focus_down)
-hs.hotkey.bind(mods, "k", PaperWM.actions.focus_up)
-hs.hotkey.bind(mods, "l", PaperWM.actions.focus_right)
-
-hs.hotkey.bind(shiftmods, "h", PaperWM.actions.move_left)
-hs.hotkey.bind(shiftmods, "j", PaperWM.actions.move_down)
-hs.hotkey.bind(shiftmods, "k", PaperWM.actions.move_up)
-hs.hotkey.bind(shiftmods, "l", PaperWM.actions.move_right)
-PaperWM.space_names = {"comms", "web", "util", "code", 1, 2, 3, 4, 5, 6, 7, 8, 9}
-PaperWM.default_app_space = {
-    ["Microsoft Outlook"] = "comms", Slack = "comms", 
-    Finder = "util", Ghostty = "util", Terminal = "util", 
-    Firefox = "web", Safari = "web", ["Google Chrome"] = "web", qutebrowser = "web",
-    Code = "code", 
-}
-PaperWM.apps_open_in_background = {
-    "Firefox", "Safari", "Google Chrome"
-}
-PaperWM:start()
-```
-
-
-`PaperWM:start()` will begin automatically tiling new and existing windows. `PaperWM:stop()` will
-release control over windows.
-
-Set `PaperWM.window_gap` to the number of pixels to space between windows and
-the top and bottom screen edges.
-
-Configure one or many `PaperWM.window_filter:rejectApp("appName")` to ignore specific applications. For example:
-
-```lua
-PaperWM.window_filter:rejectApp("iStat Menus Status")
-PaperWM.window_filter:rejectApp("Finder")
-PaperWM:start() -- restart for new window filter to take effect
-```
-
-Set `PaperWM.window_ratios` to the ratios to cycle window widths and heights
-through. For example:
-
-```lua
-PaperWM.window_ratios = { 0.23607, 0.38195, 0.61804 }
-```
+Edit as needed based on preferences for keyboard shortcuts and use of spaces. This configuration adds a [MenuHammer](https://github.com/FryJay/MenuHammer) menu for window management. After most operations, the menu remains active, so it's nice for multiple operations.
 
 ## Limitations
 
