@@ -460,6 +460,7 @@ function PaperWM:focusSpace(space, window, force)
     local current_active_space = window_list.screen_active_space[screen_id]
     local screen_frame = Screen.find(screen_id):frame()
     window_list.screen_active_space[screen_id] = space
+    animation_duration = 0.0
     for _space, cols in pairs(window_list.spaces) do
         if _space ~= space then
             for _, col in ipairs(cols) do
@@ -496,6 +497,7 @@ function PaperWM:focusSpace(space, window, force)
             w:focus()
         end
     end
+    animation_duration = 0.2
     updateMenu()
 end
 
@@ -951,6 +953,7 @@ function PaperWM:focusWindow(direction, focused_index)
                 focused_index.col + direction, row)
             if new_focused_window then break end
         end
+        animation_duration = 0.2
     elseif (direction == Direction.UP and focused_index.row == 1) or
            (direction == Direction.DOWN and focused_index.row == #window_list.spaces[focused_index.space][focused_index.col]) then
         self:focusSpace(nextSpace(direction))
@@ -995,6 +998,7 @@ function PaperWM:swapWindows(direction)
     end
 
     if direction == Direction.LEFT or direction == Direction.RIGHT then
+        animation_duration = 0.2
         -- get target windows
         local target_index = { col = focused_index.col + direction }
         local target_column = getColumn(focused_index.space, target_index.col)
@@ -1139,7 +1143,7 @@ function PaperWM:setWindowFullWidth()
     local canvas = getCanvas(focused_window:screen())
     local focused_frame = focused_window:frame()
     focused_frame.x, focused_frame.w = canvas.x, canvas.w
-    animation_duration = 0.3
+    animation_duration = 0.2
     self:moveWindow(focused_window, focused_frame)
 
     -- update layout
@@ -1544,7 +1548,7 @@ function PaperWM:moveWindow(window, frame)
     Timer.doAfter(animation_duration + padding, function()
         watcher:start({ Watcher.windowMoved, Watcher.windowResized })
     end)
-    animation_duration = 0
+    -- animation_duration = 0
 end
 
 ---add or remove focused window from the floating layer and retile the space
