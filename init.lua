@@ -1352,18 +1352,6 @@ function PaperWM:barfWindow()
     self:tileSpace(focused_index.space)
 end
 
----switch to a space up or down relative to the current space
----@param direction Direction use Direction.UP or Direction.DOWN
-function PaperWM:focusNextSpace(direction)
-    self:focusSpace(nextSpace(direction))
-end
-
----move active window to a space up or down relative to the current space
----@param direction Direction use Direction.UP or Direction.DOWN
-function PaperWM:moveWindowToNextSpace(direction)
-        self:moveWindowToSpace(nextSpace(direction))
-end
-
 ---move focused window to a Mission Control space
 ---@param index number ID for space
 ---@param window Window|nil optional window to move
@@ -1586,24 +1574,25 @@ function PaperWM:toggleFloating()
     end
 end
 
+---simple window chooser
 function PaperWM:chooseWindow()
     local windows = Window.visibleWindows()
     local chooserData = {}
 
     local chooser = hs.chooser.new(function(choice)
         if not choice then return end
-        local windows = self.window_filter:getWindows()
-        for _, w in ipairs(windows) do
+        for _, w in ipairs(self.window_filter:getWindows()) do
             if w:id() == choice.uuid then
                 w:focus()
                 return
             end
         end
-        -- local window = Window.get(choice.uuid)  -- doesn't work for fullscreen windows
-        -- print(window)
-        -- if window then
-        --     window:focus()
-        -- end
+        for _, w in ipairs(copy(self.window_filter):setOverrideFilter{fullscreen=true}:getWindows()) do
+            if w:id() == choice.uuid then
+                w:focus()
+                return
+            end
+        end
     end)
 
     local screenFrame = Screen.mainScreen():frame()
