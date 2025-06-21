@@ -497,7 +497,7 @@ function PaperWM:focusSpace(space, window, force)
             w:focus()
         end
     end
-    animation_duration = 0.2
+    animation_duration = 0.1
     updateMenu()
 end
 
@@ -953,7 +953,7 @@ function PaperWM:focusWindow(direction, focused_index)
                 focused_index.col + direction, row)
             if new_focused_window then break end
         end
-        animation_duration = 0.2
+        animation_duration = 0.1
     elseif (direction == Direction.UP and focused_index.row == 1) or
            (direction == Direction.DOWN and focused_index.row == #window_list.spaces[focused_index.space][focused_index.col]) then
         self:focusSpace(nextSpace(direction))
@@ -998,7 +998,7 @@ function PaperWM:swapWindows(direction)
     end
 
     if direction == Direction.LEFT or direction == Direction.RIGHT then
-        animation_duration = 0.2
+        animation_duration = 0.1
         -- get target windows
         local target_index = { col = focused_index.col + direction }
         local target_column = getColumn(focused_index.space, target_index.col)
@@ -1143,7 +1143,7 @@ function PaperWM:setWindowFullWidth()
     local canvas = getCanvas(focused_window:screen())
     local focused_frame = focused_window:frame()
     focused_frame.x, focused_frame.w = canvas.x, canvas.w
-    animation_duration = 0.2
+    animation_duration = 0.1
     self:moveWindow(focused_window, focused_frame)
 
     -- update layout
@@ -1213,7 +1213,7 @@ function PaperWM:cycleWindowSize(direction, cycle_direction)
         local new_width = findNewSize(canvas.w, focused_frame.w, cycle_direction)
         focused_frame.x = focused_frame.x + ((focused_frame.w - new_width) // 2)
         focused_frame.w = new_width
-        animation_duration = 0.2
+        animation_duration = 0.1
     elseif direction == Direction.HEIGHT then
         local new_height = findNewSize(canvas.h, focused_frame.h, cycle_direction)
         focused_frame.y = math.max(canvas.y, focused_frame.y + ((focused_frame.h - new_height) // 2))
