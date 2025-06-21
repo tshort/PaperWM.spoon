@@ -64,7 +64,7 @@ PaperWM.license = "MIT - https://opensource.org/licenses/MIT"
 ---@alias PaperWM table PaperWM module object
 ---@alias Window userdata a ui.window
 ---@alias Frame table hs.geometry rect
----@alias Index { row: number, col: number, space: number }
+---@alias Index { row: number, col: number, space: number, screen_id: number }
 ---@alias Space number a Mission Control space ID
 ---@alias Screen userdata hs.screen
 
@@ -106,8 +106,10 @@ PaperWM.window_filter = WindowFilter.new():setOverrideFilter({
 -- default space_names
 PaperWM.space_names = {1, 2, 3, 4, 5, 6, 7, 8, 9}
 
-PaperWM.appsOpenNextTo = {}
-
+---First index of `value` in `array`; also used to check if `value` exists in `array`
+---@param array Array
+---@param value 
+---@return number|nil
 function indexOf(array, value)
     for i, v in ipairs(array) do
         if v == value then
@@ -211,8 +213,8 @@ function copy(obj, seen)
   return res
 end
 
----move a window offscreen
----@param windowframe window to move
+---move a window offscreen, and retain its position
+---@param windowframe WindowFrame to stash
 ---@return nil
 function PaperWM:stashWindow(windowframe)
     local idx = index_table[windowframe.win:id()]
@@ -224,6 +226,9 @@ function PaperWM:stashWindow(windowframe)
     windowframe.frame = frame2
 end        
 
+---move a window offscreen
+---@param window Window to stash
+---@return nil
 function PaperWM:hideWindow(window)
     -- if not window then return end
     local idx = index_table[window:id()]
@@ -234,7 +239,7 @@ function PaperWM:hideWindow(window)
 end        
 
 ---restore a window
----@param windowframe window to move
+---@param windowframe WindowFrame to move
 ---@return nil
 function PaperWM:restoreWindow(windowframe)
     self:moveWindow(windowframe.win, windowframe.frame)
@@ -242,7 +247,7 @@ end
 
 
 ---return the leftmost window that's completely on the screen
----@param columns Window[] a column of windows
+---@param columns WindowFrame[] a column of windowframes
 ---@param screen Frame the coordinates of the screen
 ---@return Window|nil
 local function getFirstVisibleWindow(columns, screen)
@@ -258,7 +263,7 @@ end
 ---get a column of windows for a space from the window_list
 ---@param space Space
 ---@param col number
----@return Window[]
+---@return WindowFrame[]
 local function getColumn(space, col) 
     return (window_list.spaces[space] or {})[col] 
 end
@@ -267,7 +272,7 @@ end
 ---@param space Space
 ---@param col number
 ---@param row number
----@return Window
+---@return Window|nil
 local function getWindow(space, col, row)
     local col = getColumn(space, col) or {}
     if col[row] then
@@ -277,6 +282,11 @@ local function getWindow(space, col, row)
     end
 end
 
+---get a windowframe in a row, in a column, in a space from the window_list
+---@param space Space
+---@param col number
+---@param row number
+---@return WindowFrame|nil
 local function getWindowFrame(space, col, row)
     return (getColumn(space, col) or {})[row]
 end
@@ -434,6 +444,7 @@ end
 ---make the specified space the active space
 ---@param space Space
 ---@param window Window|nil a window in the space
+---@param force boolean whether to force a re-focus
 function PaperWM:focusSpace(space, window, force)
     -- space = tostring(space)
     if not space or window_list.active_space == space and not force then
@@ -672,6 +683,8 @@ function PaperWM:tileSpace(space)
     end
 end
 
+---repopulate `window_list` and tile and focus spaces
+---@param add_windows boolean if true, re-add all windows
 function PaperWM:reset(add_windows)
     window_list.screen_ids = {}
     window_list.screen_active_space = {}
@@ -1086,8 +1099,7 @@ function PaperWM:centerWindow()
     self:moveWindow(focused_window, focused_frame)
 
     -- update layout
-    -- local space = Spaces.windowSpaces(focused_window)[1]
-    -- self:tileSpace(space)
+    self:tileSpace(index_table[focused_window:id()].space)
 end
 
 ---set the focused window to the width of the screen
