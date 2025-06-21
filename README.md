@@ -60,6 +60,8 @@ There are still bugs:
 
 It would also be nice to allow windows to be in multiple spaces, but that's a big code change and would require removing or changing `index_table`.
 
+https://github.com/user-attachments/assets/7a88cdac-afab-4d04-9d9c-40d529aa4c04
+
 ## Original PaperWM.spoon info
 
 Many of the original [PaperWM.spoon](https://github.com/mogenson/PaperWM.spoon) docs and issues are still appropriate.
