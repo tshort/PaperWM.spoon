@@ -54,7 +54,6 @@ Here are new or changed commands:
 
 There are still bugs:
 
-- Sometimes everything blitzes out, and spaces keep switching, making everything flicker. Sometimes switching spaces helps. Locking and coming back out can stop it.
 - Sometimes, cycling window widths doesn't work right.
 - After returning from full screen, the window doesn't show the right space.
 

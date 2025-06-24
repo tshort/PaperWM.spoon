@@ -166,9 +166,7 @@ local window_list = {} -- 2D array of tiles by space in order of .spaces[space][
                        --   .spaces[space][x][y].frame
                        
 local index_table = {} -- dictionary of {screen_num, space, x, y} with window id for keys
--- local ui_watchers = {} -- dictionary of uielement watchers with window id for keys
 local ui_watchers = {} -- dictionary of uielement watchers with window id for keys
--- local is_floating = {} -- dictionary of boolean with window id for keys
 local is_floating = {} -- dictionary of boolean with window id for keys
 local menubar = hs.menubar.new(true, "spaceindicator")
 local last_focused_app = "" -- stores the name of the last app with focus
@@ -484,7 +482,7 @@ function PaperWM:focusSpace(space, window, force)
     window_list.active_space = space
     if window then
         focused_window = window
-        window:focus()
+        -- window:focus()
     elseif window_list.spaces[space].focused_window and 
            #window_list.spaces[space] > 0 and 
            Window.find(window_list.spaces[space].focused_window) and
@@ -781,9 +779,9 @@ function PaperWM:addWindow(add_window, space)
 
     local window_stay = nil
     local stored_position = window_columns[add_window:application():title() .. add_window:title()]
+    local same_app = last_focused_app == add_window:application():title()
     if not space then
         local default_space = PaperWM.default_app_space[add_window:application():title()]  
-        local same_app = last_focused_app == add_window:application():title()
         if stored_position and stored_position[1] ~= "*" then
             space = stored_position[1]
             for i = 1, #window_list.spaces[space] do
@@ -820,7 +818,7 @@ function PaperWM:addWindow(add_window, space)
     -- focused_window from previous window focused event will not be add_window
     -- Window.focusedWindow() will return add_window
     -- new window focused event for add_window has not happened yet
-    if not stored_position then
+    if not stored_position or same_app then
         if focused_window and
             ((index_table[focused_window:id()] or {}).space == space) and
             (focused_window:id() ~= add_window:id()) then
@@ -974,6 +972,13 @@ function PaperWM:focusWindow(direction, focused_index)
     new_focused_window:focus()
     local idx = index_table[new_focused_window:id()]
     window_list.spaces[idx.space].focused_window = new_focused_window:id()
+    -- try to prevent MacOS from stealing focus away to another window
+    Timer.doAfter(animation_duration, function()
+        if Window.focusedWindow() ~= new_focused_window then
+            self.logger.df("refocusing window %s", new_focused_window)
+            new_focused_window:focus()
+        end
+    end)
     return new_focused_window
 end
 
