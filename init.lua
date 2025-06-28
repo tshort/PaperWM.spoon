@@ -109,6 +109,7 @@ PaperWM.space_names = {1, 2, 3, 4, 5, 6, 7, 8, 9}
 
 -- apps that open new windows in the background automatically
 PaperWM.apps_open_in_background = {}
+PaperWM.one_shot_open_in_background = false
 
 
 ---First index of `value` in `array`; also used to check if `value` exists in `array`
@@ -807,9 +808,10 @@ function PaperWM:addWindow(add_window, space)
             screen_num = window_list.spaces[default_space].screen_num
             space = default_space
         end
-        if open_in_background or 
-           (same_app and focused_window and indexOf(PaperWM.apps_open_in_background, focused_window:application():title())) then
+        if (open_in_background or self.one_shot_open_in_background) and 
+           same_app and focused_window and indexOf(PaperWM.apps_open_in_background, focused_window:application():title()) then
             window_stay = copy(focused_window)
+            self.one_shot_open_in_background = false
         end
     end
     screen_num = screen_num or indexOf(window_list.screen_ids, add_window:screen():id())
