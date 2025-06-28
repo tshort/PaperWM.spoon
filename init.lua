@@ -153,7 +153,7 @@ local IsFloatingKey <const> = 'PaperWM_is_floating'
 local window_columns = hs.settings.get("PaperWM_window_columns") or {}
 
 -- array of windows sorted from left to right
-local window_list = {} -- 2D array of tiles by space in order of .spaces[space][x][y]
+window_list = {} -- 2D array of tiles by space in order of .spaces[space][x][y]
                        -- also stores 
                        --   .active_space
                        --   .screen_active_space[]
@@ -937,6 +937,9 @@ function PaperWM:focusWindow(direction, focused_index)
         focused_index = index_table[focused_window:id()]
     end
 
+    if focused_index.space ~= window_list.active_space then   -- in an empty space
+        focused_index = {space = window_list.active_space, screen_id = window_list.screen_ids[space], row = 1, col = 1}
+    end
     if not focused_index then
         self.logger.e("focusWindow: focused index not found")
         return
@@ -953,13 +956,12 @@ function PaperWM:focusWindow(direction, focused_index)
         end
         animation_duration = 0.1
     elseif (direction == Direction.UP and focused_index.row == 1) or
-           (direction == Direction.DOWN and focused_index.row == #window_list.spaces[focused_index.space][focused_index.col]) then
+           (direction == Direction.DOWN and focused_index.row >= #(window_list.spaces[focused_index.space][focused_index.col] or {})) then
         self:focusSpace(nextSpace(direction))
     elseif direction == Direction.UP or direction == Direction.DOWN then
         new_focused_window = getWindow(focused_index.space, focused_index.col,
             focused_index.row + (direction // 2))
     end
-
     if not new_focused_window then
         self.logger.d("new focused window not found")
         return
