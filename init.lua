@@ -107,6 +107,10 @@ PaperWM.window_filter = WindowFilter.new():setOverrideFilter({
 -- default space_names
 PaperWM.space_names = {1, 2, 3, 4, 5, 6, 7, 8, 9}
 
+-- apps that open new windows in the background automatically
+PaperWM.apps_open_in_background = {}
+
+
 ---First index of `value` in `array`; also used to check if `value` exists in `array`
 ---@param array Array
 ---@param value 
@@ -171,6 +175,7 @@ local is_floating = {} -- dictionary of boolean with window id for keys
 local menubar = hs.menubar.new(true, "spaceindicator")
 local last_focused_app = "" -- stores the name of the last app with focus
 local animation_duration = 0
+local open_in_background = false
 
 local function updateMenu()
     local title = ""
@@ -802,7 +807,8 @@ function PaperWM:addWindow(add_window, space)
             screen_num = window_list.spaces[default_space].screen_num
             space = default_space
         end
-        if same_app and focused_window and indexOf(PaperWM.apps_open_in_background, focused_window:application():title()) then
+        if open_in_background or 
+           (same_app and focused_window and indexOf(PaperWM.apps_open_in_background, focused_window:application():title())) then
             window_stay = copy(focused_window)
         end
     end
@@ -1502,6 +1508,10 @@ function PaperWM:closeWindowsInSpace()
     end
 end
 
+function PaperWM:toggleOpenInBackground()
+    open_in_background = not open_in_background
+end
+
 function PaperWM:tileAll()
     for _, space in ipairs(window_list.space_names) do
         self:tileSpace(space)
@@ -1707,6 +1717,7 @@ PaperWM.actions = {
     slurp_in = partial(PaperWM.slurpWindow, PaperWM),
     barf_out = partial(PaperWM.barfWindow, PaperWM),
     choose_window = partial(PaperWM.chooseWindow, PaperWM),
+    toggle_open_in_background = partial(PaperWM.toggleOpenInBackground, PaperWM),
 }
 
 ---bind userdefined hotkeys to PaperWM actions
