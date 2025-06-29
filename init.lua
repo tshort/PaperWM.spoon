@@ -158,7 +158,7 @@ local IsFloatingKey <const> = 'PaperWM_is_floating'
 local window_columns = hs.settings.get("PaperWM_window_columns") or {}
 
 -- array of windows sorted from left to right
-window_list = {} -- 2D array of tiles by space in order of .spaces[space][x][y]
+local window_list = {} -- 2D array of tiles by space in order of .spaces[space][x][y]
                        -- also stores 
                        --   .active_space
                        --   .screen_active_space[]
@@ -1512,6 +1512,7 @@ end
 
 function PaperWM:toggleOpenInBackground()
     open_in_background = not open_in_background
+    hs.alert.show("Open in background turned " .. (open_in_background and "on." or "off."))
 end
 
 function PaperWM:tileAll()
