@@ -51,6 +51,7 @@ Here are new or changed commands:
 - `choose_window`--This is a simple window selector that shows the available windows ordered by space. It's good enough to reduce the need for something like AltTab.
 - `next_screen`--Focus the next screen (note that the next screen needs a space in which to focus).
 - `space_to_next_screen`--Move the active space to the next screen.
+- `toggle_open_in_background`--Toggles whether windows open next to the focused window in the background. Only for windows in `PaperWM.apps_open_in_background`. A variable `PaperWM.one_shot_open_in_background` is also available to enable opening the next window in the background. That's useful for application-specific hotkeys. 
 
 There are still bugs:
 
@@ -140,7 +141,9 @@ With the `PaperWM.apps_open_in_background` option, you can set new browser windo
 
 ## Other apps that work well with scrolling windows
 
-Terminal-based apps, including editors like Helix work great with scrolling windows.
+Terminal-based apps, including editors like Helix work great with scrolling windows. Kitty works well because it has the `--single-instance` option to use the same instance of kitty. That and the `--title` option are useful for hotkeys and scripts.
+
+Note that windows opened with `open -n -a ...` don't work with PaperWM. This is a Hammerspoon bug ([3235](https://github.com/Hammerspoon/hammerspoon/issues/3235), [3596](https://github.com/Hammerspoon/hammerspoon/issues/3596)).
 
 VS Code has the option "Move into New Window" for tabs. That works nicely.
 

@@ -107,6 +107,11 @@ PaperWM.window_filter = WindowFilter.new():setOverrideFilter({
 -- default space_names
 PaperWM.space_names = {1, 2, 3, 4, 5, 6, 7, 8, 9}
 
+-- apps that open new windows in the background automatically
+PaperWM.apps_open_in_background = {}
+PaperWM.one_shot_open_in_background = false
+
+
 ---First index of `value` in `array`; also used to check if `value` exists in `array`
 ---@param array Array
 ---@param value 
@@ -153,7 +158,7 @@ local IsFloatingKey <const> = 'PaperWM_is_floating'
 local window_columns = hs.settings.get("PaperWM_window_columns") or {}
 
 -- array of windows sorted from left to right
-window_list = {} -- 2D array of tiles by space in order of .spaces[space][x][y]
+local window_list = {} -- 2D array of tiles by space in order of .spaces[space][x][y]
                        -- also stores 
                        --   .active_space
                        --   .screen_active_space[]
@@ -171,6 +176,7 @@ local is_floating = {} -- dictionary of boolean with window id for keys
 local menubar = hs.menubar.new(true, "spaceindicator")
 local last_focused_app = "" -- stores the name of the last app with focus
 local animation_duration = 0
+local open_in_background = false
 
 local function updateMenu()
     local title = ""
@@ -802,8 +808,10 @@ function PaperWM:addWindow(add_window, space)
             screen_num = window_list.spaces[default_space].screen_num
             space = default_space
         end
-        if same_app and focused_window and indexOf(PaperWM.apps_open_in_background, focused_window:application():title()) then
+        if (open_in_background or self.one_shot_open_in_background) and 
+           same_app and focused_window and indexOf(PaperWM.apps_open_in_background, focused_window:application():title()) then
             window_stay = copy(focused_window)
+            self.one_shot_open_in_background = false
         end
     end
     screen_num = screen_num or indexOf(window_list.screen_ids, add_window:screen():id())
@@ -1502,6 +1510,11 @@ function PaperWM:closeWindowsInSpace()
     end
 end
 
+function PaperWM:toggleOpenInBackground()
+    open_in_background = not open_in_background
+    hs.alert.show("Open in background turned " .. (open_in_background and "on." or "off."))
+end
+
 function PaperWM:tileAll()
     for _, space in ipairs(window_list.space_names) do
         self:tileSpace(space)
@@ -1707,6 +1720,7 @@ PaperWM.actions = {
     slurp_in = partial(PaperWM.slurpWindow, PaperWM),
     barf_out = partial(PaperWM.barfWindow, PaperWM),
     choose_window = partial(PaperWM.chooseWindow, PaperWM),
+    toggle_open_in_background = partial(PaperWM.toggleOpenInBackground, PaperWM),
 }
 
 ---bind userdefined hotkeys to PaperWM actions
